@@ -1,0 +1,21 @@
+python pretrain.py train \
+	--dataroot "/data/lcs/batch2_merged_final/transform_remesh" \
+	--checkpoint "/data/lcs/new_checkpoints/for_lower_2/loss-0.1482-314.pkl" \
+	--batch_size 128 --n_classes 40 \
+	--augment_scale --augment_deformation --augment_orient --n_epoch 700 \
+	--name "single" \
+	--weight_decay 0.05 \
+	--mask_ratio 0.5 \
+	--channels 10 --patch_size 64 \
+	--lr 1e-4 \
+	--weight 0.5 \
+	--depth 12 \
+	--n_dropout 2 \
+	--heads 12 \
+	--lr_milestones "none" --optim "adamw" \
+	--encoder_depth 12 \
+	--decoder_depth 6 \
+	--decoder_dim 512 \
+	--decoder_num_heads 16 \
+	--num_warmup_steps "2" \
+	--dim 768
