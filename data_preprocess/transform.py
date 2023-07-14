@@ -45,11 +45,11 @@ def paste(index,dataroot,outputroot,num):
     vedo.write(after_mesh_upper,os.path.join(outputroot,f'{num}_after_upper.vtp'))
     print(num)
 
-def get_mesh(obj_path,outputroot,paramroot,num):
+def get_mesh(index,dataroot,outputroot,paramroot,num):
     seed_torch(num)
-    mesh = vedo.Mesh(str(obj_path))
+    mesh = vedo.Mesh(os.path.join(dataroot,f'{index}_before.vtp'))
     labels = mesh.celldata['Label']
-    dofs = torch.cat([torch.normal(mean=0.,std=0.02,size=(32,3)),torch.normal(mean=0.,std=0.05,size=(32,3))],dim=1)
+    dofs = torch.cat([torch.normal(mean=0.,std=0.02,size=(32,3)),torch.normal(mean=0.,std=0.02,size=(32,3))],dim=1)
     trans = se3_exp_map(dofs).transpose(1,2)
     teeth = []
     ran = range(1,33)
@@ -61,8 +61,9 @@ def get_mesh(obj_path,outputroot,paramroot,num):
             tmp.celldata['Label'] = torch.ones(len(tmp.faces()))*i
             teeth.append(tmp)
     after_mesh =  vedo.merge(teeth)
+    mesh2 = vedo.Mesh(os.path.join(dataroot,f'{index}_after.vtp'))
     vedo.write(after_mesh,os.path.join(outputroot,f'before_{num}.vtp'))
-    vedo.write(mesh,os.path.join(outputroot,f'after_{num}.vtp'))
+    vedo.write(mesh2,os.path.join(outputroot,f'after_{num}.vtp'))
     trans_matrix = torch.inverse(trans)
     torch.save(trans_matrix,os.path.join(paramroot,f'matrix_{num}.pkl'))
     dofs_gt = se3_log_map(trans_matrix.transpose(1,2))
@@ -95,9 +96,12 @@ def get_mesh(obj_path,outputroot,paramroot,num):
 #         )
 # pool.close()
 # pool.join()
-dataroot = Path('/data/lcs/finetuned_teeth/centered_after')
-outputroot = Path('/data/lcs/finetuned_teeth/transformed_centered_after')
-paramroot = Path('/data/lcs/finetuned_teeth/transformed_after_param')
+with open('check.txt','r',encoding='utf-8') as f:
+    lines = f.readlines()
+    indexes = [int(i) for i in lines]
+dataroot = Path('/data/lcs/finetuned_teeth/centered_registered')
+outputroot = Path('/data/lcs/finetuned_teeth/transformed_centered_registered')
+paramroot = Path('/data/lcs/finetuned_teeth/centered_registered_param')
 os.makedirs(outputroot,exist_ok=True)
 os.makedirs(paramroot,exist_ok=True)
 # for obj in dataroot.iterdir():
@@ -111,10 +115,10 @@ for _ in range(n_variance):
     #             get_mesh,
     #             (obj,outputroot,paramroot,num+i,False)
     #         )
-    for i,obj_path in enumerate(dataroot.iterdir()):
+    for i,index in enumerate(indexes):
         pool.apply_async(
                 get_mesh,
-                (obj_path,outputroot,paramroot,num+i)
+                (index,dataroot,outputroot,paramroot,num+i)
             )
     pool.close()
     pool.join()
