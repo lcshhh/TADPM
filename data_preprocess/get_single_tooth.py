@@ -6,7 +6,7 @@ import numpy as np
 from multiprocessing import Pool
 import vedo
 def extract_tooth(dataroot,outputroot,index):
-    mesh = vedo.Mesh(os.path.join(dataroot,f'before_{index}.vtp'))
+    mesh = vedo.Mesh(os.path.join(dataroot,f'after_{index}.vtp'))
     labels = mesh.celldata['Label']
     num = index
     for i in range(1,33):
@@ -20,11 +20,11 @@ def extract_tooth(dataroot,outputroot,index):
 with open('check.txt','r',encoding='utf-8') as f:
     lines = f.readlines()
     indexes = [int(i) for i in lines]
-dataroot = Path('/data/lcs/finetuned_teeth/transformed_centered_after')
-outputroot = '/data/lcs/finetuned_teeth/single_after_before'   #
+dataroot = Path('/data/lcs/finetuned_teeth/transformed_centered_registered')
+outputroot = '/data/lcs/finetuned_teeth/single_registered_after'   #
 os.makedirs(outputroot,exist_ok=True)
 pool = Pool(processes=64)
-for i in range(2120):
+for i in range(790):
      pool.apply_async(
           extract_tooth,
           (dataroot,outputroot,i)

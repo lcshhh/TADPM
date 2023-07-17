@@ -46,10 +46,10 @@ def quad_simplify(obj_path,output_root_simplify,output_root_manifold):
     mesh.export(os.path.join(output_root_simplify,obj_path.name))
 
 if __name__ == '__main__':
-    root = '/data/lcs/finetuned_teeth/single_after_before'
+    root = '/data/lcs/finetuned_teeth/single_registered_before'
     dataroot = Path(root)
-    output_root_manifold = '/data/lcs/finetuned_teeth/single_after_manifold'
-    output_root_simplify = '/data/lcs/finetuned_teeth/single_after_simplify'
+    output_root_manifold = '/data/lcs/finetuned_teeth/single_registered_manifold'
+    output_root_simplify = '/data/lcs/finetuned_teeth/single_registered_simplify'
     if not os.path.exists(output_root_manifold):
         os.mkdir(output_root_manifold)
     if not os.path.exists(output_root_simplify):

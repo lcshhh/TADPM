@@ -1,11 +1,11 @@
 python train.py train \
 	--checkpoint "/data/lcs/new_checkpoints/for_lower_2/loss-0.1482-314.pkl" \
-	--total_checkpoint "/data/lcs/new_checkpoints/new_loss_2/best_acc.pkl" \
+	--total_checkpoint "/data/lcs/new_checkpoints/new_data/best_acc.pkl" \
 	--dataroot "/data/lcs/finetuned_teeth/single_after_remesh" \
 	--paramroot "/data/lcs/finetuned_teeth/transformed_after_param" \
 	--batch_size 8 --n_classes 40 \
 	--n_epoch 700 \
-	--name "new_data" \
+	--name "new_data_2" \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \

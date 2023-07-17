@@ -1,1 +1,1 @@
-/data/lcs/batch2_merged_final/transform_single/548_19.obj
+/data/lcs/finetuned_teeth/single_registered_before/106_15.obj
