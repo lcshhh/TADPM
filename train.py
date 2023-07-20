@@ -254,7 +254,7 @@ def train(net, optim, scheduler, names, criterion, train_dataset, epoch, args, a
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, trans_6dof).to(torch.float32)
         loss = 0.03*chamfer_loss(before_points,after_points,outputs)
         loss2 = cal_centroid_2(centroid,after_centroid,outputs,0) + cal_centroid_2(centroid,after_centroid,outputs,1) + cal_centroid_2(centroid,after_centroid,outputs,2)
-        # loss += loss2
+        loss += loss2
         # loss3 = 100*criterion(outputs, trans_6dof)
         # print(loss3)
         # loss += loss3
