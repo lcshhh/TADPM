@@ -5,11 +5,11 @@ python train.py train \
 	--paramroot "/data/lcs/finetuned_teeth/transformed_after_param" \
 	--batch_size 8 --n_classes 40 \
 	--n_epoch 700 \
-	--name "new_data_3" \
+	--name "new_data_5" \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \
-	--lr 4e-4 \
+	--lr 4e-6 \
 	--weight 0.5 \
 	--depth 12 \
 	--heads 12 \

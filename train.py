@@ -155,6 +155,34 @@ def chamfer_loss(before_points,after_points,outputs):
         loss += tmp
     return loss/bs
 
+def dis_matrix(points):
+    """
+    points:[32,2048,3]
+    """
+    n = points.shape[0]
+    distance_matrix = torch.zeros(n,n)
+    for i in range(n):
+        for j in range(n):
+            tmp,_ = chamfer_distance(points[i].unsqueeze(0), points[j].unsqueeze(0), point_reduction="sum", norm=1)
+            distance_matrix[i][j] = tmp
+    return distance_matrix
+
+def chamfer_loss_2(before_points,after_points,outputs):
+    bs = before_points.shape[0]
+    loss = torch.FloatTensor([0]).cuda()
+    for i in range(bs):
+        trans_matrix = se3_exp_map(outputs[i]).transpose(1,2)      # [16,4,4]    
+        riged_tar = Transform3d(matrix=trans_matrix.transpose(1,2)).transform_points(before_points[i])
+        # N,P,C = before_points.shape
+        # before_points_pre = torch.cat([before_points[i],torch.ones(N,P,1).cuda()],dim=-1).permute(0,2,1)
+        # riged_tar = torch.bmm(trans_matrix,before_points_pre).permute(0,2,1)
+        # riged_tar = riged_tar[:,:,:3]
+        matrix1 = dis_matrix(after_points[i])
+        matrix2 = dis_matrix(riged_tar)
+        tmp = torch.mean(torch.abs(matrix1-matrix2))
+        loss += tmp
+    return loss/bs
+
 def cal_distance(centroids):
     '''
     centroids: [16,3]
@@ -206,13 +234,42 @@ def cal_centroid_2(centroid,after_centroid,outputs,index):
             pre_dis = torch.sqrt(torch.sum(torch.square(predicted_centroid[:16] - predicted_centroid[16:]),dim=-1))
             after_dis = torch.sqrt(torch.sum(torch.square(after_centroid[i][:16] - after_centroid[i][16:]),dim=-1))
         loss += torch.abs(pre_dis - after_dis).sum()
-    # for i in range(bs):
-    #     trans_matrix = se3_exp_map(outputs[i]).transpose(2,1) # [16,4,4]
-    #     predicted_centroid = Transform3d(matrix=trans_matrix.transpose(2,1)).transform_points(centroid[i].unsqueeze(1)).squeeze(1) # [16,3]
-    #     # pre_dis = torch.sqrt(torch.sum(torch.square(predicted_centroid[:-1] - predicted_centroid[1:]),dim=-1))
-    #     # after_dis = torch.sqrt(torch.sum(torch.square(after_centroid[i][:-1] - after_centroid[i][1:]),dim=-1))
-    #     loss += torch.abs(after_centroid - predicted_centroid).sum()
     return loss/bs
+
+def get_centroid_matrix(centroid):
+    '''
+    centroid [32,3]
+    '''
+    n = centroid.shape[0]
+    distance_matrix = torch.zeros(n,n)
+    for i in range(n):
+        for j in range(n):
+            # distance_matrix[i][j] = torch.sqrt(torch.sum(torch.square(centroid[i]-centroid[j])))
+            distance_matrix[i][j] = torch.sum(torch.abs(centroid[i]-centroid[j]))
+    return distance_matrix
+
+
+def cal_centroid_3(centroid,after_centroid,outputs):
+    '''
+    centroid [bs,32,3]
+    '''
+    # pdist = nn.PairwiseDistance(p=2)
+    # print('centroid',centroid)
+    # print('after_centroid',outputs)
+    bs = centroid.shape[0]
+    loss = torch.FloatTensor([0]).cuda()
+    # criterion = nn.L1Loss(reduction='mean')
+    for i in range(bs):
+        trans_matrix = se3_exp_map(outputs[i]).transpose(2,1) # [16,4,4]
+        predicted_centroid = Transform3d(matrix=trans_matrix.transpose(2,1)).transform_points(centroid[i].unsqueeze(1)).squeeze(1) # [16,3]
+        matrix1 = get_centroid_matrix(predicted_centroid)
+        matrix2 = get_centroid_matrix(after_centroid[i])
+        # matrix1 = torch.tensor([1])
+        # matrix2 = torch.zeros(32,32)
+        # matrix2 = torch.tensor([1])
+        loss += torch.abs(matrix1 - matrix2).sum()
+    return loss/bs
+
         
         
 
@@ -253,12 +310,14 @@ def train(net, optim, scheduler, names, criterion, train_dataset, epoch, args, a
         else:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, trans_6dof).to(torch.float32)
         loss = 0.03*chamfer_loss(before_points,after_points,outputs)
-        loss2 = cal_centroid_2(centroid,after_centroid,outputs,0) + cal_centroid_2(centroid,after_centroid,outputs,1) + cal_centroid_2(centroid,after_centroid,outputs,2)
-        loss += loss2
+        # loss2 = cal_centroid_2(centroid,after_centroid,outputs,0) + cal_centroid_2(centroid,after_centroid,outputs,1) + cal_centroid_2(centroid,after_centroid,outputs,2)
+        loss2 = cal_centroid_3(centroid,after_centroid,outputs)
+        loss += 0.05*loss2
         # loss3 = 100*criterion(outputs, trans_6dof)
         # print(loss3)
         # loss += loss3
-        # loss = loss3
+        # loss4 = 0.03*chamfer_loss_2(before_points,after_points,outputs)
+        # loss += loss4
         # _, preds = torch.max(outputs, 1)
         # running_corrects += torch.sum(preds == labels.data)
         loss.backward()
