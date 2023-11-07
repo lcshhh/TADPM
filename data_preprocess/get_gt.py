@@ -20,7 +20,7 @@ def registration(before_path,after_path,outputroot,index):
             # mesh1 = vedo.vedo2trimesh(mesh_before)
             # mesh2 = vedo.vedo2trimesh(mesh_after)
             points = mesh_before.sample(2048)
-            matrix = trimesh.registration.icp(points,mesh_after,scale=False,max_iterations=50)[0]
+            matrix = trimesh.registration.icp(points,mesh_after,scale=False)[0]
             trans_matrix[i] = torch.from_numpy(matrix)
     trans_6dof = se3_log_map(trans_matrix.transpose(1,2))
     torch.save(trans_matrix,os.path.join(outputroot,f'matrix_{index}.pkl'))

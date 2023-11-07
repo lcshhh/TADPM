@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import random
 import trimesh
+import torchsummary
 import torch.nn.functional as F
 from pytorch3d.loss import chamfer_distance
 from pytorch3d.transforms import se3_exp_map
@@ -77,6 +78,83 @@ def seed_torch(seed=12):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
+
+def unit_vector(data, axis=None, out=None):
+    length = torch.atleast_1d(torch.sum(data * data))
+    torch.sqrt(length,out=length)
+    data /= length
+    return data
+
+# def unit_vector(data, axis=None, out=None):
+#     data = np.array(data, dtype=np.float32, copy=True)
+#     length = np.atleast_1d(np.sum(data * data, axis))
+#     np.sqrt(length, length)
+#     if axis is not None:
+#         length = np.expand_dims(length, axis)
+#     data /= length
+#     if out is None:
+#         return torch.tensor(data)
+    
+def translation_matrix(direction):
+    """
+    Return matrix to translate by direction vector.
+
+    >>> v = np.random.random(3) - 0.5
+    >>> np.allclose(v, translation_matrix(v)[:3, 3])
+    True
+
+    """
+    # are we 2D or 3D
+    dim = len(direction)
+    # start with identity matrix
+    # M = np.identity(dim + 1)
+    M = torch.eye(dim+1)
+    # apply the offset
+    M[:dim, dim] = direction[:dim]
+    return M
+
+import math
+
+def rotation_matrix(angle, direction, point=None):
+    sina = math.sin(angle)
+    cosa = math.cos(angle)
+    direction = unit_vector(direction[:3])
+    # rotation matrix around unit vector
+    M = torch.diag(torch.tensor([cosa, cosa, cosa, 1.0]))
+    M[:3, :3] += torch.outer(direction, direction) * (1.0 - cosa)
+
+    direction = direction * sina
+    M[:3, :3] += torch.tensor([[0.0, -direction[2], direction[1]],
+                           [direction[2], 0.0, -direction[0]],
+                           [-direction[1], direction[0], 0.0]])
+    return M
+
+def rotate_and_translate(centroid,trans,anglex,angley,anglez):
+    angle_x = anglex * np.pi / 180
+    angle_y = angley * np.pi / 180
+    angle_z = anglez * np.pi / 180
+
+    # 创建旋转矩阵
+    rotation_x = rotation_matrix(angle_x, torch.tensor([1., 0., 0.]))
+    rotation_y = rotation_matrix(angle_y, torch.tensor([0., 1., 0.]))
+    rotation_z = rotation_matrix(angle_z, torch.tensor([0., 0., 1.]))
+    rotation = rotation_z.mm(rotation_y).mm(rotation_x)
+
+    # 计算网格的中心
+    # center = mesh.centroid
+
+        # 创建平移矩阵，将网格移动到原点
+    translation_1 = translation_matrix(-centroid)
+        # 创建平移矩阵，将网格移回原来的位置
+    translation_2 = translation_matrix(centroid)
+
+        # 组合变换矩阵
+    transform = translation_2.mm(rotation).mm(translation_1)
+
+        # 应用变换矩阵
+    translation = translation_matrix(trans)
+
+    return translation.mm(transform)
 
 
 def plot_embedding(data, label, title):
@@ -137,20 +215,19 @@ def cos_similiar(outputs,targets):
         cos_sim[i] = matrix_similiar(output,target)
     return cos_sim.mean()
 
-def chamfer_loss(before_points,after_points,outputs):
+def chamfer_loss(centroid,before_points,after_points,outputs):
     '''
     outputs: [bs,16,6]
     before_points: [bs,16,2048,3]
     '''
     bs = before_points.shape[0]
+    n = before_points.shape[1]
     loss = torch.FloatTensor([0]).cuda()
     for i in range(bs):
-        trans_matrix = se3_exp_map(outputs[i]).transpose(1,2)      # [16,4,4]    
+        trans_matrix = torch.zeros((n,4,4)).cuda()
+        for j in range(n):
+            trans_matrix[j] = rotate_and_translate(centroid[i][j],outputs[i][j][:3],outputs[i][j][3],outputs[i][j][4],outputs[i][j][5])      # [16,4,4]    
         riged_tar = Transform3d(matrix=trans_matrix.transpose(1,2)).transform_points(before_points[i])
-        # N,P,C = before_points.shape
-        # before_points_pre = torch.cat([before_points[i],torch.ones(N,P,1).cuda()],dim=-1).permute(0,2,1)
-        # riged_tar = torch.bmm(trans_matrix,before_points_pre).permute(0,2,1)
-        # riged_tar = riged_tar[:,:,:3]
         tmp,_ = chamfer_distance(after_points[i], riged_tar, point_reduction="sum", norm=1)
         loss += tmp
     return loss/bs
@@ -201,7 +278,7 @@ def cal_centroid(centroid,after_centroid,outputs):
     # criterion = nn.L1Loss(reduction='mean')
     for i in range(bs):
         trans_matrix = se3_exp_map(outputs[i]).transpose(2,1) # [16,4,4]
-        predicted_centroid = Transform3d(matrix=trans_matrix.transpose(2,1)).transform_points(centroid[i].unsqueeze(1)).squeeze(1) # [16,3]
+        predicted_centroid = centroid[i] + outputs[i,:,:3]
         pre_dis = torch.sqrt(torch.sum(torch.square(predicted_centroid[:-1] - predicted_centroid[1:]),dim=-1))
         after_dis = torch.sqrt(torch.sum(torch.square(after_centroid[i][:-1] - after_centroid[i][1:]),dim=-1))
         loss += torch.abs(pre_dis - after_dis).sum()
@@ -223,7 +300,8 @@ def cal_centroid_2(centroid,after_centroid,outputs,index):
     # criterion = nn.L1Loss(reduction='mean')
     for i in range(bs):
         trans_matrix = se3_exp_map(outputs[i]).transpose(2,1) # [16,4,4]
-        predicted_centroid = Transform3d(matrix=trans_matrix.transpose(2,1)).transform_points(centroid[i].unsqueeze(1)).squeeze(1) # [16,3]
+        # predicted_centroid = Transform3d(matrix=trans_matrix.transpose(2,1)).transform_points(centroid[i].unsqueeze(1)).squeeze(1) # [16,3]
+        predicted_centroid = centroid[i] + outputs[i,:,:3]
         if index == 0:
             pre_dis = torch.sqrt(torch.sum(torch.square(predicted_centroid[:15] - predicted_centroid[1:16]),dim=-1))
             after_dis = torch.sqrt(torch.sum(torch.square(after_centroid[i][:15] - after_centroid[i][1:16]),dim=-1))
@@ -261,7 +339,7 @@ def cal_centroid_3(centroid,after_centroid,outputs):
     # criterion = nn.L1Loss(reduction='mean')
     for i in range(bs):
         trans_matrix = se3_exp_map(outputs[i]).transpose(2,1) # [16,4,4]
-        predicted_centroid = Transform3d(matrix=trans_matrix.transpose(2,1)).transform_points(centroid[i].unsqueeze(1)).squeeze(1) # [16,3]
+        predicted_centroid = centroid[i] + outputs[i,:,:3]
         matrix1 = get_centroid_matrix(predicted_centroid)
         matrix2 = get_centroid_matrix(after_centroid[i])
         # matrix1 = torch.tensor([1])
@@ -309,17 +387,10 @@ def train(net, optim, scheduler, names, criterion, train_dataset, epoch, args, a
             outputs = net.process_feature(rec_embedding,trans_6dof).to(torch.float32)
         else:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, trans_6dof).to(torch.float32)
-        loss = 0.03*chamfer_loss(before_points,after_points,outputs)
-        # loss2 = cal_centroid_2(centroid,after_centroid,outputs,0) + cal_centroid_2(centroid,after_centroid,outputs,1) + cal_centroid_2(centroid,after_centroid,outputs,2)
-        loss2 = cal_centroid_3(centroid,after_centroid,outputs)
-        loss += 0.05*loss2
-        # loss3 = 100*criterion(outputs, trans_6dof)
-        # print(loss3)
-        # loss += loss3
-        # loss4 = 0.03*chamfer_loss_2(before_points,after_points,outputs)
-        # loss += loss4
-        # _, preds = torch.max(outputs, 1)
-        # running_corrects += torch.sum(preds == labels.data)
+        loss = 0.1*chamfer_loss(centroid,before_points,after_points,outputs)
+        loss2 = cal_centroid_2(centroid,after_centroid,outputs,0) + cal_centroid_2(centroid,after_centroid,outputs,1) + cal_centroid_2(centroid,after_centroid,outputs,2)
+        loss3 = cal_centroid_3(centroid,after_centroid,outputs)
+        loss += loss2 * 0.5 + loss3 * 0.5
         loss.backward()
         optim.step()
         running_loss += loss.item() * faces.size(0)
@@ -369,7 +440,7 @@ def test(net, names, criterion, test_dataset, epoch, args, autoencoder=None):
                 outputs = net.process_feature(rec_embedding,trans_6dof).to(torch.float32)
             else:
                 outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, trans_6dof).to(torch.float32)
-            loss = chamfer_loss(before_points,after_points,outputs)
+            loss = chamfer_loss(centroid,before_points,after_points,outputs)
             loss2 = cal_centroid(centroid,after_centroid,outputs)
             # loss = cos_similiar(outputs,trans_matrix)
             running_loss += loss.item() * faces.size(0)
@@ -482,11 +553,16 @@ def test_and_save(net, names, criterion, test_dataset, epoch, args):
         batch_size = faces.shape[0]
         trans_6dof = trans_6dof.to(torch.float32).cuda()
         with torch.no_grad():
+            import time
+            t1 = time.time()
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, trans_6dof).detach()
             # loss = chamfer_loss(before_points,after_points,outputs)
             # running_loss += loss.item() * faces.size(0)
             for i in range(index.shape[0]):
                 transform_teeth(index[i],outputs[i])
+            t2 = time.time()
+            print(t2-t1)
+            exit()
     # epoch_loss = running_loss / n_samples
     # print(epoch_loss)
 
@@ -559,12 +635,6 @@ if __name__ == '__main__':
 
     # ========== Dataset ==========
     augments = []
-    # if args.augment_scale:
-    #     augments.append('scale')
-    # if args.augment_orient:
-    #     augments.append('orient')
-    # if args.augment_deformation:
-    #     augments.append('deformation')
     dataManager = TeethRegressorDataManager(dataroot,paramroot,args.train_ratio,)
     train_dataset = dataManager.train_dataset()
     # test_dataset = ClassificationDataset(dataroot, train=False)
@@ -581,16 +651,14 @@ if __name__ == '__main__':
         pure_test_data_loader = data.DataLoader(pure_test_dataset, num_workers=args.n_worker, batch_size=args.batch_size,
                                        shuffle=False, pin_memory=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net = teethArranger(args).to(device)
-    auto_encoder = None
-    if args.use_ae:     
-        auto_encoder = AutoEncoder(1840).to(device)
-        checkpoint1 = torch.load(args.ae_checkpoint)
-        auto_encoder.load_state_dict(checkpoint1)
-    # if args.mode != 'train':
+    net = teethArranger(args)
     if args.total_checkpoint != 'none':
         checkpoint = torch.load(args.total_checkpoint)
         net.load_state_dict(checkpoint,strict=True)
+    net = nn.DataParallel(net).to(device)
+    auto_encoder = None
+    # if args.mode != 'train':
+    
 
     # ========== Optimizer ==========
     if args.optim.lower() == 'adamw':
@@ -619,7 +687,6 @@ if __name__ == '__main__':
     test.best_loss = 1000
 
     # ========== Start Training ==========
-
     if args.mode == 'train':
         for epoch in range(args.n_epoch):
             # train_data_loader.dataset.set_epoch(epoch)

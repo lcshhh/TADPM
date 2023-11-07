@@ -271,7 +271,6 @@ class Mesh_encoder(nn.Module):
         # x = self.head(tokens)
 
         return tokens
-
 class teethArranger(nn.Module):
     def __init__(self,args):
         super(teethArranger, self).__init__()
@@ -292,7 +291,6 @@ class teethArranger(nn.Module):
         if self.use_mlp:
             self.regressor = nn.Sequential(
                 nn.Linear(1888, 512),
-                # nn.Linear(816, 512),
                 nn.GELU(),
                 nn.Dropout(p=0.3),
                 nn.Linear(512, 256),
@@ -341,6 +339,7 @@ class teethArranger(nn.Module):
         n = faces.shape[1]
         encodings = []
         for i in range(n):
+            # flops, params = profile(self.encoder, inputs=(faces[:,i],feats[:,i],centers[:,i],Fs[:,i],cordinates[:,i]))
             encoding = self.encoder(faces[:,i],feats[:,i],centers[:,i],Fs[:,i],cordinates[:,i])
             encodings.append(encoding)
         embedding = torch.stack(encodings,dim=1)  #[bs,32,768]
