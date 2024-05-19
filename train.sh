@@ -1,4 +1,4 @@
-python train.py train \
+python train.py \
 	--checkpoint "/data/lcs/new_checkpoints/for_lower_2/loss-0.1482-314.pkl" \
 	--total_checkpoint "/data/lcs/new_checkpoints/new_loss_2_resume/best_acc.pkl" \
 	--dataroot "/data/lcs/finetuned_teeth/single_after_remesh" \

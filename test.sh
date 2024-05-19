@@ -1,4 +1,4 @@
-python train.py test \
+python test.py \
 	--encoder_checkpoint "/data/lcs/new_checkpoints/for_lower_2/loss-0.1482-314.pkl" \
     --checkpoint "/data/lcs/new_checkpoints/new_loss_2/best_acc.pkl" \
 	--dataroot "/data/lcs/batch2_merged_final/transform_remesh" \
