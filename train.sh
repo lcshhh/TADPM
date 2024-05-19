@@ -3,6 +3,7 @@ python train.py train \
 	--total_checkpoint "/data/lcs/new_checkpoints/new_loss_2_resume/best_acc.pkl" \
 	--dataroot "/data/lcs/finetuned_teeth/single_after_remesh" \
 	--paramroot "/data/lcs/finetuned_teeth/transformed_after_param" \
+	--save_dir '/data/lcs/new_checkpoints' \
 	--batch_size 8 --n_classes 40 \
 	--n_epoch 700 \
 	--name "new_data_8" \
@@ -20,5 +21,3 @@ python train.py train \
 	--decoder_num_heads 16 \
 	--num_warmup_steps "2" \
 	--dim 768 \
-	--use_pointnet \
-	--lower 

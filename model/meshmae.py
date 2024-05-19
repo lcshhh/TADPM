@@ -220,16 +220,6 @@ class Mesh_encoder(nn.Module):
         self.max_pooling2 = nn.MaxPool2d((256, 1))
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.cls_token_pos = nn.Parameter(torch.zeros(1, 1, embed_dim))
-        # self.classifier = nn.Sequential(
-        #     nn.Linear(embed_dim, 512),
-        #     nn.ReLU(),
-        #     nn.Dropout(p=0.5),
-        #     nn.Linear(512, 256),
-        #     nn.ReLU(),
-        #     nn.Dropout(p=0.5),
-        #     nn.Linear(256, 40)
-        # )
-        # self.head = nn.Linear(embed_dim, 40)
         self.initialize_weights()
 
     def initialize_weights(self):
@@ -285,8 +275,8 @@ class teethArranger(nn.Module):
             decoder_num_heads=args.decoder_num_heads,
             decoder_depth=args.decoder_depth
         )
-        if args.checkpoint != 'none':
-            self.encoder.load_state_dict(torch.load(args.checkpoint), strict=False)
+        if args.encoder_checkpoint != 'none':
+            self.encoder.load_state_dict(torch.load(args.encoder_checkpoint), strict=False)
         self.use_mlp = args.use_mlp
         if self.use_mlp:
             self.regressor = nn.Sequential(
@@ -303,23 +293,7 @@ class teethArranger(nn.Module):
         embed_dim = args.dim
         self.embed_dim = embed_dim
         self.use_pointnet = args.use_pointnet
-        # if self.use_pointnet:
         self.global_encoder = PointNetEncoder(False)
-        # else:
-        #     self.global_encoder = Mesh_encoder_modified(
-        #         decoder_embed_dim=args.decoder_dim,
-        #         masking_ratio=args.mask_ratio,
-        #         encoder_depth=args.encoder_depth,
-        #         num_heads=16,
-        #         channels=args.channels,
-        #         patch_size=args.patch_size,
-        #         embed_dim=1024,
-        #         decoder_num_heads=args.decoder_num_heads,
-        #         decoder_depth=args.decoder_depth
-        #     )
-        #     if args.global_checkpoint != 'none':
-        #         print(args.global_checkpoint)
-        #         self.global_encoder.load_state_dict(torch.load(args.global_checkpoint), strict=False)
         self.pos_embedding = nn.Sequential(
             nn.Linear(3, 128),
             nn.GELU(),
@@ -333,13 +307,12 @@ class teethArranger(nn.Module):
         
     def forward(self,faces, feats, centers, Fs, cordinates, centroid, points, gt_6dof=None):
         '''
-        points [bs,32,2048,3]
+        points [bs,teeth_num,point_num,3]
         '''
         bs = faces.shape[0]
         n = faces.shape[1]
         encodings = []
         for i in range(n):
-            # flops, params = profile(self.encoder, inputs=(faces[:,i],feats[:,i],centers[:,i],Fs[:,i],cordinates[:,i]))
             encoding = self.encoder(faces[:,i],feats[:,i],centers[:,i],Fs[:,i],cordinates[:,i])
             encodings.append(encoding)
         embedding = torch.stack(encodings,dim=1)  #[bs,32,768]
@@ -348,20 +321,8 @@ class teethArranger(nn.Module):
         for blk in self.blocks:
             trans_feature = blk(trans_feature)
         trans_feature = self.norm_layer(trans_feature)
-        if self.use_pointnet:
-            global_embedding = self.global_encoder(points.view(bs,-1,3).permute(0,2,1)).unsqueeze(1).repeat(1,n,1)
-        else:
-            global_embedding = self.global_encoder(None,feats.permute(0,2,1,3,4).reshape(bs,10,4096,64),centers.view(bs,4096,64,3),None,None)
-        # embedding = self.bn(global_embedding.permute(0,2,1)).permute(0,2,1)
-        # global_embedding = self.bn(global_embedding)
-        # trans_feature = 
-            global_embedding = global_embedding.unsqueeze(1).repeat(1,n,1)
+        global_embedding = self.global_encoder(points.view(bs,-1,3).permute(0,2,1)).unsqueeze(1).repeat(1,n,1)
         center_emb = centroid.view(faces.shape[0],-1).unsqueeze(1).repeat(1,n,1)
         embedding = torch.cat([global_embedding,trans_feature,center_emb],dim=-1)
-        # print(embedding.shape)
-        # embedding = self.bn(embedding.permute(0,2,1)).permute(0,2,1)
-        if self.use_mlp:
-            dofs = self.regressor(embedding)
-        else:
-            dofs = self.regressor(gt_6dof,embedding)
+        dofs = self.regressor(gt_6dof,embedding)
         return dofs

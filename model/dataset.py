@@ -214,22 +214,22 @@ class teethRegressorDataset(data.Dataset):
         before_points_centered = np.zeros((32,2048,3))
         trans_6dof = torch.load(os.path.join(self.paramroot,f'6dof_{index}.pkl'))
         trans_matrix = torch.load(os.path.join(self.paramroot,f'matrix_{index}.pkl'))
-        for i in range(1,33):
+        for i in range(32):
             obj_path = os.path.join(self.dataroot,f'{index}_{i}.obj')
             if os.path.exists(obj_path):
                 # masks[i] = 1
-                feats[i-1], center[i-1], cordinates[i-1], faces[i-1], Fs[i-1]= load_mesh_shape(obj_path, 
+                feats[i], center[i], cordinates[i], faces[i], Fs[i]= load_mesh_shape(obj_path, 
                                                                 request=self.feats)
+            # path to teeth before manifold
             before_path = os.path.join('/data/lcs/finetuned_teeth/single_after_before',f'{index}_{i}.obj')
             after_path = os.path.join('/data/lcs/finetuned_teeth/single_after_after',f'{index}_{i}.obj')
             if os.path.exists(before_path):
                 after_mesh = trimesh.load_mesh(after_path)
                 before_mesh = trimesh.load_mesh(before_path)
-                before_points[i-1] = np.array(trimesh.sample.sample_surface_even(before_mesh,count=2048)[0])
-                after_points[i-1] = np.array(trimesh.sample.sample_surface_even(after_mesh,count=2048)[0])
-                centroid[i-1] = before_mesh.centroid
-                # before_points_centered[i] = before_points[i] - np.array(centroid[i]).unsqueeze(0).repeat((2048,1))
-                after_centroid[i-1] = after_mesh.centroid
+                before_points[i] = np.array(trimesh.sample.sample_surface_even(before_mesh,count=2048)[0])
+                after_points[i] = np.array(trimesh.sample.sample_surface_even(after_mesh,count=2048)[0])
+                centroid[i] = before_mesh.centroid
+                after_centroid[i] = after_mesh.centroid
 
 
         return   feats,center,cordinates,faces,Fs,trans_6dof,trans_matrix,index,before_points,after_points,centroid,after_centroid,before_points_centered

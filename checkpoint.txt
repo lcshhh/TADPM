@@ -1,3 +1,0 @@
-new_data_2:只用正畸后数据，loss
-new_data_3:只用正畸后数据，loss+loss2
-new_data_4:只用正畸后数据，loss+loss4
