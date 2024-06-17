@@ -1,0 +1,24 @@
+python train.py train \
+	--encoder_checkpoint "/data/lcs/new_checkpoints/single_meshmae/loss-0.0252-699.pkl" \
+	--dataroot "/data/lcs/dataset/teeth_full/single_remesh_before_centered" \
+	--paramroot "/data/lcs/finetuned_teeth/transformed_after_param" \
+	--batch_size 16 --n_classes 40 \
+	--n_epoch 700 \
+	--name "test" \
+	--weight_decay 0.05 \
+	--mask_ratio 0.5 \
+	--channels 10 --patch_size 64 \
+	--lr 1e-4 \
+	--weight 0.5 \
+	--depth 12 \
+	--heads 12 \
+	--lr_milestones "none" --optim "adamw" \
+	--encoder_depth 12 \
+	--decoder_depth 6 \
+	--decoder_dim 512 \
+	--decoder_num_heads 16 \
+	--num_warmup_steps "2" \
+	--dim 768 \
+	--use_pointnet \
+	--lower \
+	--use_mlp \
