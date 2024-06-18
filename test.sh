@@ -1,5 +1,5 @@
 python test.py \
-	--checkpoint "/data/lcs/new_checkpoints/test/best_acc.pkl" \
+	--checkpoint "/data/lcs/created_checkpoints/augmented/best_acc.pkl" \
 	--dataroot "/data/lcs/dataset/teeth_full/single_remesh_before_centered" \
 	--paramroot "/data/lcs/finetuned_teeth/transformed_after_param" \
 	--batch_size 16 --n_classes 40 \

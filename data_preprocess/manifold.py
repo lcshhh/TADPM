@@ -45,10 +45,10 @@ def quad_simplify(obj_path,output_root_simplify,output_root_manifold):
     mesh.export(os.path.join(output_root_simplify,obj_path.name))
 
 if __name__ == '__main__':
-    root = '/data/lcs/dataset/no_norm/single_after_centered'
+    root = '/data/lcs/dataset/created/single_normed_before_centered'
     dataroot = Path(root)
-    output_root_manifold = '/data/lcs/dataset/no_norm/manifold_after_centered'
-    output_root_simplify = '/data/lcs/dataset/no_norm/simplify_after_centered'
+    output_root_manifold = '/data/lcs/dataset/created/manifold_normed_before_centered'
+    output_root_simplify = '/data/lcs/dataset/created/simplified_normed_before_centered'
     if not os.path.exists(output_root_manifold):
         os.mkdir(output_root_manifold)
     if not os.path.exists(output_root_simplify):

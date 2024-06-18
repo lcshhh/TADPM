@@ -26,7 +26,7 @@ from scipy.spatial.transform import Rotation
 from einops import rearrange
 from pytorch3d.transforms import se3_exp_map,se3_log_map
 from pytorch3d.transforms import euler_angles_to_matrix
-from dataset.dataset import FullTeethDataManager
+from dataset.dataset import OriginalFullTeethDataManager, FullTeethDataManager
 from models.tadpm import TADPM
 from util import progress_bar
 from models.utils import compute_rotation_matrix_from_ortho6d
@@ -53,20 +53,30 @@ def seed_torch(seed=12):
 #     vertices = torch.bmm(vertices - centroids,R) + centroids + move
 #     return vertices
 
-def transform_mesh(mesh,centroid,dof):
+# def transform_mesh(mesh,centroid,dof):
+#     '''
+#     vertices: [pt_num, 3]
+#     centroids: [3]
+#     dofs: [bs, 32, 6]
+#     '''
+#     angles = dof[3:].unsqueeze(0)
+#     move = (dof[:3]).unsqueeze(0) #[b*n,1,3]
+#     centroids = centroid.unsqueeze(0)
+#     # R = euler_angles_to_matrix(angles,'XYZ') #[3,3]
+#     R = compute_rotation_matrix_from_ortho6d(angles)[0]
+#     vertices = mesh.vertices
+#     vertices = torch.matmul(torch.FloatTensor(vertices).to(centroids.device) - centroids,R) + centroids + move
+#     mesh.vertices = vertices.cpu().numpy()
+#     return mesh
+def transform_mesh(mesh,dof):
     '''
-    vertices: [pt_num, 3]
-    centroids: [3]
-    dofs: [bs, 32, 6]
+    centroid [bs,16,3]
     '''
-    angles = dof[3:].unsqueeze(0)
-    move = (dof[:3]).unsqueeze(0) #[b*n,1,3]
-    centroids = centroid.unsqueeze(0)
-    # R = euler_angles_to_matrix(angles,'XYZ') #[3,3]
-    R = compute_rotation_matrix_from_ortho6d(angles)[0]
-    vertices = mesh.vertices
-    vertices = torch.matmul(torch.FloatTensor(vertices).to(centroids.device) - centroids,R) + centroids + move
-    mesh.vertices = vertices.cpu().numpy()
+    bs = dof.shape[0]
+    trans_matrix = se3_exp_map(dof.unsqueeze(0)).transpose(2,1) # [16,4,4]
+    vertices = torch.from_numpy(mesh.vertices).to(dof.device).float()
+    predicted_vertices = Transform3d(matrix=trans_matrix.transpose(2,1)[0]).transform_points(vertices)
+    mesh.vertices = predicted_vertices.cpu().numpy()
     return mesh
 
 def move_mesh(mesh,centroid,dof):
@@ -89,7 +99,7 @@ def transform_teeth(index,centroid,output):
             before_mesh = trimesh.load_mesh(path)
             before_meshes.append(vedo.trimesh2vedo(before_mesh))
             # after_mesh = move_mesh(mesh,centroid[i],output[i])
-            after_mesh = move_mesh(mesh,centroid[i],output[i])
+            after_mesh = transform_mesh(mesh,output[i])
             meshes.append(vedo.trimesh2vedo(after_mesh))
             gt_meshes.append(gt_mesh)
     mesh = vedo.merge(meshes)
@@ -134,11 +144,11 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         n_samples += faces.shape[0]
         with torch.no_grad():
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32)
-            for j in range(32):
-                predicted_centroid = centroid[0,j] + outputs[0,j,:3]
-                print('move:',outputs[0,j,:3])
-                print(predicted_centroid)
-                print(after_centroid[0,j])
+            # for j in range(32):
+            #     predicted_centroid = centroid[0,j] + outputs[0,j,:3]
+            #     print('move:',outputs[0,j,:3])
+            #     print(predicted_centroid)
+            #     print(after_centroid[0,j])
             for i in range(index.shape[0]):
                 transform_teeth(index[i],centroid[i],outputs[i])
 
@@ -184,7 +194,8 @@ if __name__ == '__main__':
 
     # ========== Dataset ==========
     augments = []
-    dataManager = FullTeethDataManager(dataroot,paramroot,args.train_ratio,)
+    # dataManager = OriginalFullTeethDataManager(dataroot,paramroot,args.train_ratio,)
+    dataManager = OriginalFullTeethDataManager(dataroot,paramroot,args.train_ratio,)
     train_dataset = dataManager.train_dataset()
     test_dataset = dataManager.test_dataset()
     print(len(train_dataset))

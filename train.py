@@ -54,44 +54,82 @@ def transform_vertices(vertices,centroids,dofs):
     return vertices
     
 
-def chamfer_loss(before_points,after_points,centroids,outputs,mask=None):
+# def chamfer_loss(before_points,after_points,centroids,outputs,mask=None):
+#     '''
+#     outputs: [bs,teeth_num,6]
+#     before_points: [bs,teeth_num,point_num,3]
+#     mask: [bs,32]
+#     '''
+#     bs = before_points.shape[0]
+#     np = before_points.shape[2]
+#     predicted_points = transform_vertices(before_points, centroids, outputs)
+#     after_points = rearrange(after_points,'b n pn c -> (b n) pn c')
+#     mask = repeat(mask,'b n -> (b n) np c', np=np, c=3)
+#     bool_mask = (mask < 0.5)
+#     predicted_points = predicted_points.masked_fill(bool_mask,value=0)
+#     after_points = after_points.masked_fill(bool_mask,value=0)
+#     loss, _ = chamfer_distance(after_points, predicted_points, point_reduction="mean", norm=1)
+#     return loss
+
+def chamfer_loss(before_points,after_points,outputs):
     '''
-    outputs: [bs,teeth_num,6]
-    before_points: [bs,teeth_num,point_num,3]
-    mask: [bs,32]
+    outputs: [bs,16,6]
+    before_points: [bs,16,2048,3]
     '''
     bs = before_points.shape[0]
-    np = before_points.shape[2]
-    predicted_points = transform_vertices(before_points, centroids, outputs)
-    after_points = rearrange(after_points,'b n pn c -> (b n) pn c')
-    mask = repeat(mask,'b n -> (b n) np c', np=np, c=3)
-    bool_mask = (mask < 0.5)
-    predicted_points = predicted_points.masked_fill(bool_mask,value=0)
-    after_points = after_points.masked_fill(bool_mask,value=0)
-    loss, _ = chamfer_distance(after_points, predicted_points, point_reduction="mean", norm=1)
-    return loss
+    loss = torch.FloatTensor([0]).cuda()
+    # for i in range(bs):
+    #     trans_matrix = se3_exp_map(outputs[i]).transpose(1,2)      # [16,4,4]    
+    #     riged_tar = Transform3d(matrix=trans_matrix.transpose(1,2)).transform_points(before_points[i])
+    #     # N,P,C = before_points.shape
+    #     # before_points_pre = torch.cat([before_points[i],torch.ones(N,P,1).cuda()],dim=-1).permute(0,2,1)
+    #     # riged_tar = torch.bmm(trans_matrix,before_points_pre).permute(0,2,1)
+    #     # riged_tar = riged_tar[:,:,:3]
+    #     tmp,_ = chamfer_distance(after_points[i], riged_tar, point_reduction="sum", norm=1)
+    #     loss += tmp
+    outputs = rearrange(outputs,'b n c -> (b n) c')
+    trans_matrix = se3_exp_map(outputs).transpose(1,2)
+    before_points = rearrange(before_points,'b n p c -> (b n) p c')
+    after_points = rearrange(after_points,'b n p c -> (b n) p c')
+    riged_tar = Transform3d(matrix=trans_matrix.transpose(1,2)).transform_points(before_points)
+    loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
+    return loss/bs
 
-def centroid_loss(before_centroids,after_centroids,outputs,mask=None):
+# def centroid_loss(before_centroids,after_centroids,outputs,mask=None):
+#     '''
+#     before_centroids:[bs, 32, 3]
+#     after_centroids:[bs, 32, 3]
+#     outputs:[bs, 32, 6]
+#     '''
+#     bs = before_centroids.shape[0]
+#     n = before_centroids.shape[1]
+#     predicted_centrodis = before_centroids + outputs[:,:,:3]
+#     criterion = nn.MSELoss(reduction='none')
+#     loss = criterion(after_centroids,predicted_centrodis).sum(dim=-1)
+#     loss = (loss * mask.float()).sum()
+#     non_zero_elements = mask.sum()
+#     mse_loss_val = loss / non_zero_elements
+#     # predicted_points = transform_vertices(before_points, centroids, outputs)
+#     # after_points = rearrange(after_points,'b n pn c -> (b n) pn c')
+#     # mask = repeat(mask,'b n -> (b n) np c', np=np, c=3)
+#     # predicted_points = predicted_points.masked_fill(mask,value=0)
+#     # after_points = after_points.masked_fill(mask,value=0)
+#     # loss, _ = chamfer_distance(after_points, predicted_points, point_reduction="sum", norm=2)
+#     return mse_loss_val
+
+def centroid_loss(centroid,after_centroid,outputs):
     '''
-    before_centroids:[bs, 32, 3]
-    after_centroids:[bs, 32, 3]
-    outputs:[bs, 32, 6]
+    centroid [bs,16,3]
     '''
-    bs = before_centroids.shape[0]
-    np = before_centroids.shape[1]
-    predicted_centrodis = before_centroids + outputs[:,:,:3]
-    criterion = nn.MSELoss(reduction='none')
-    loss = criterion(after_centroids,predicted_centrodis).sum(dim=-1)
-    loss = (loss * mask.float()).sum()
-    non_zero_elements = mask.sum()
-    mse_loss_val = loss / non_zero_elements
-    # predicted_points = transform_vertices(before_points, centroids, outputs)
-    # after_points = rearrange(after_points,'b n pn c -> (b n) pn c')
-    # mask = repeat(mask,'b n -> (b n) np c', np=np, c=3)
-    # predicted_points = predicted_points.masked_fill(mask,value=0)
-    # after_points = after_points.masked_fill(mask,value=0)
-    # loss, _ = chamfer_distance(after_points, predicted_points, point_reduction="sum", norm=2)
-    return mse_loss_val
+    bs = centroid.shape[0]
+    loss = torch.FloatTensor([0]).cuda()
+    for i in range(bs):
+        trans_matrix = se3_exp_map(outputs[i]).transpose(2,1) # [16,4,4]
+        predicted_centroid = Transform3d(matrix=trans_matrix.transpose(2,1)).transform_points(centroid[i].unsqueeze(1)).squeeze(1) # [16,3]
+        pre_dis = torch.sqrt(torch.sum(torch.square(predicted_centroid[:-1] - predicted_centroid[1:]),dim=-1))
+        after_dis = torch.sqrt(torch.sum(torch.square(after_centroid[i][:-1] - after_centroid[i][1:]),dim=-1))
+        loss += torch.abs(pre_dis - after_dis).sum()
+    return loss/bs
 
 def train(net, optim, names, scheduler, train_dataset, epoch, args):
     net.train()
@@ -114,13 +152,14 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         before_points = before_points.to(torch.float32).cuda()
         after_points = after_points.to(torch.float32).cuda()
         outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
-        # loss1 = 100*chamfer_loss(before_points,after_points,centroid, outputs, masks).mean()
-        loss2 = 1e3*centroid_loss(centroid, after_centroid, outputs, masks)
+        loss1 = chamfer_loss(before_points,after_points,outputs)
+        loss2 = centroid_loss(centroid, after_centroid, outputs)
         # loss = chamfer_loss(before_points,after_points,outputs).mean()
-        # print(loss1,loss2)
-        # loss = loss1 + loss2
-        print('centroid loss:',loss2)
-        loss = loss2
+        print('loss1:',loss1)
+        print('loss2:',loss2)
+        loss = loss1 + loss2
+        # print('centroid loss:',loss2)
+        # loss = loss2
         loss.backward()
         optim.step()
         running_loss += loss.item() * faces.size(0)
@@ -129,13 +168,13 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
     scheduler.step()
     epoch_loss = running_loss / n_samples
     message = 'epoch ({:}): {:} Train Loss: {:.4f}'.format(names, epoch, epoch_loss)
-    with open(os.path.join('/data/lcs/new_checkpoints', names, 'log.txt'), 'a') as f:
+    with open(os.path.join('/data/lcs/created_checkpoints', names, 'log.txt'), 'a') as f:
         f.write(message+'\n')
     print()
     print(message)
     if (epoch+1)%50 == 0:
         best_model_wts = copy.deepcopy(net.state_dict())
-        torch.save({'model':best_model_wts,'optim':optim.state_dict(),'scheduler':scheduler.state_dict(),'epoch':epoch}, os.path.join('/data/lcs/new_checkpoints', names, f'acc-{epoch_loss:.4f}-{epoch}.pkl'))
+        torch.save({'model':best_model_wts,'optim':optim.state_dict(),'scheduler':scheduler.state_dict(),'epoch':epoch}, os.path.join('/data/lcs/created_checkpoints', names, f'acc-{epoch_loss:.4f}-{epoch}.pkl'))
 
 def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencoder=None):
 
@@ -165,7 +204,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         with torch.no_grad():
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32)
             # loss = 512*chamfer_loss(before_points,after_points,centroid, outputs, masks)
-            loss = 1e3*centroid_loss(centroid, after_centroid, outputs, masks)
+            loss = chamfer_loss(before_points,after_points,outputs)
             running_loss += loss.item() * faces.size(0)
             progress_bar(it, len(test_dataset), 'Test Loss: %.3f'% (running_loss/n_samples))
 
@@ -173,11 +212,11 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     if test.best_loss > epoch_loss:
         test.best_loss = epoch_loss
         best_model_wts = copy.deepcopy(net.state_dict())
-        torch.save({'model':best_model_wts,'optim':optimizer.state_dict(),'scheduler':scheduler.state_dict(),'epoch':epoch}, os.path.join('/data/lcs/new_checkpoints', names, 'best_acc.pkl'))
-        # torch.save(best_model_wts, os.path.join('/data/lcs/new_checkpoints', names, 'best_acc.pkl'))
+        torch.save({'model':best_model_wts,'optim':optimizer.state_dict(),'scheduler':scheduler.state_dict(),'epoch':epoch}, os.path.join('/data/lcs/created_checkpoints', names, 'best_acc.pkl'))
+        # torch.save(best_model_wts, os.path.join('/data/lcs/created_checkpoints', names, 'best_acc.pkl'))
 
     message = 'epoch ({:}): {:} test Loss: {:.4f}'.format(names, epoch, epoch_loss)
-    with open(os.path.join('/data/lcs/new_checkpoints', names, 'log.txt'), 'a') as f:
+    with open(os.path.join('/data/lcs/created_checkpoints', names, 'log.txt'), 'a') as f:
         f.write(message+'\n')
     print()
     print(message)
@@ -248,7 +287,7 @@ if __name__ == '__main__':
     optimizer = optim.Adam(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.n_epoch)
     checkpoint_names = []
-    checkpoint_path = os.path.join('/data/lcs/new_checkpoints', args.name)
+    checkpoint_path = os.path.join('/data/lcs/created_checkpoints', args.name)
 
     os.makedirs(checkpoint_path, exist_ok=True)
 

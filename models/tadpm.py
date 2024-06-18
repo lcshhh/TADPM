@@ -42,12 +42,12 @@ class TADPM(nn.Module):
             # )
             self.regressor = nn.Sequential(
                 nn.Linear(1827, 1024),
-                nn.Dropout(0.3),
+                # nn.Dropout(0.3),
                 nn.GELU(),
                 nn.Linear(1024, 512),
-                nn.Dropout(0.3),
+                # nn.Dropout(0.3),
                 nn.GELU(),
-                nn.Linear(512, 32*9)
+                nn.Linear(512, 32*6)
             )
         else:
             self.regressor = diffuse(1888,use_ae=args.use_ae)

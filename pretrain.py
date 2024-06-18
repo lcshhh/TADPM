@@ -147,8 +147,8 @@ if __name__ == '__main__':
     net = torch.nn.DataParallel(net)
     if args.checkpoint != '':
         print(args.checkpoint)
-        net.load_state_dict(torch.load(args.checkpoint), strict=True)
-    cudnn.benchmark = True
+        net.load_state_dict(torch.load(args.checkpoint)['model'], strict=True)
+        cudnn.benchmark = True
 
     # ========== Optimizer ==========
     if args.optim.lower() == 'adamw':

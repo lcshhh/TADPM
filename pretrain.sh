@@ -1,10 +1,10 @@
 python pretrain.py train \
-	--dataroot "/data/lcs/dataset/teeth_full/single_remesh_before_centered" \
-	--checkpoint "/data/lcs/new_checkpoints/single_meshmae/loss-0.0252-699.pkl" \
+	--dataroot "/data/lcs/dataset/created/remesh_normed_before_centered" \
+	--checkpoint "/data/lcs/TADPM_checkpoints/single_meshmae_test/loss-0.0027-299.pkl" \
 	--batch_size 32 \
 	--augment_scale --augment_orient --n_epoch 700 \
 	--num_warmup_steps 2 \
-	--name "single_meshmae_test" \
+	--name "single_meshmae" \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \
@@ -18,5 +18,5 @@ python pretrain.py train \
 	--decoder_depth 6 \
 	--decoder_dim 512 \
 	--decoder_num_heads 16 \
-	--saveroot "/data/lcs/TADPM_checkpoints" \
+	--saveroot "/data/lcs/created_checkpoints" \
 	--dim 768

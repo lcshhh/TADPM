@@ -144,9 +144,10 @@ class FullTeethDataManager:
         self.dataroot = Path(dataroot)
         self.train_ratio = train_ratio
         self.paramroot = paramroot
-        with open('valid.txt','r',encoding='utf-8') as f:
-            lines = f.readlines()
-            self.useful_lst = [int(i.strip()) for i in lines]
+        # with open('valid.txt','r',encoding='utf-8') as f:
+        #     lines = f.readlines()
+        #     self.useful_lst = [int(i.strip()) for i in lines]
+        self.useful_lst = [i for i in range(821*5)]
         self.browse_dataroot()
     
     def browse_dataroot(self):
@@ -187,6 +188,77 @@ class FullTeethDataset(data.Dataset):
         masks = np.zeros((32),dtype=np.int32)
         for i in range(32):
             obj_path = os.path.join(self.dataroot,f'{index}_{i}.obj')
+            before_path = os.path.join('/data/lcs/dataset/created/single_pointcloud_before512',f'{index}_{i}.ply')
+            after_path = os.path.join('/data/lcs/dataset/created/single_pointcloud_after512',f'{index}_{i}.ply')
+            if os.path.exists(obj_path) and os.path.exists(before_path) and os.path.exists(after_path):
+                masks[i] = 1
+                feats[i], center[i], cordinates[i], faces[i], Fs[i]= load_mesh_shape(obj_path, 
+                                                                request=self.feats)
+                before = read_pointcloud(before_path)
+                before_points[i] = before[:512]
+                centroid[i] = before[512]
+                after = read_pointcloud(after_path)
+                after_points[i] = after[:512]
+                after_centroid[i] = after[512]
+                # before_points[i] = read_pointcloud(before_path)
+                # after_points[i] = read_pointcloud(after_path)
+        return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,masks
+        # return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,before_points_centered
+
+
+    def __len__(self):
+        return len(self.indexes)
+
+class OriginalFullTeethDataManager:
+    def __init__(self, dataroot, paramroot, train_ratio=0.9):
+        super().__init__()
+        self.dataroot = Path(dataroot)
+        self.train_ratio = train_ratio
+        self.paramroot = paramroot
+        with open('valid.txt','r',encoding='utf-8') as f:
+            lines = f.readlines()
+            self.useful_lst = [int(i.strip()) for i in lines]
+        # self.useful_lst = [i for i in range(821*5)]
+        self.browse_dataroot()
+    
+    def browse_dataroot(self):
+        random.shuffle(self.useful_lst)
+        split_point = int(len(self.useful_lst) * self.train_ratio)
+        self.train_objs = self.useful_lst[:split_point]
+        self.test_objs = self.useful_lst[split_point:]
+    
+    def train_dataset(self):
+        dataset = OriginalFullTeethDataset(self.dataroot, self.paramroot, self.train_objs,True)
+        return dataset
+
+    def test_dataset(self):
+        dataset = OriginalFullTeethDataset(self.dataroot, self.paramroot, self.test_objs,False)
+        return dataset
+
+class OriginalFullTeethDataset(data.Dataset):
+    def __init__(self, dataroot, paramroot, objs, train=True):
+        super().__init__()
+        self.feats = ['area', 'face_angles', 'curvs', 'normal']
+        self.dataroot = dataroot
+        self.paramroot = paramroot
+        self.indexes = objs
+        self.train = train
+    
+    def __getitem__(self, idx):
+        point_num = 512
+        feats = np.zeros((32,10,256,64))
+        center = np.zeros((32,256,64,3))
+        cordinates = np.zeros((32,256,64,9))
+        faces = np.zeros((32,256,64,3))
+        Fs = np.zeros(32)
+        before_points = np.zeros((32,point_num,3))
+        after_points = np.zeros((32,point_num,3))
+        centroid = np.zeros((32,3))
+        after_centroid = np.zeros((32,3))
+        index = self.indexes[idx]
+        masks = np.zeros((32),dtype=np.int32)
+        for i in range(32):
+            obj_path = os.path.join(self.dataroot,f'{index}_{i}.obj')
             before_path = os.path.join('/data/lcs/dataset/teeth_full/single_pointcloud_before512',f'{index}_{i}.ply')
             after_path = os.path.join('/data/lcs/dataset/teeth_full/single_pointcloud_after512',f'{index}_{i}.ply')
             if os.path.exists(obj_path) and os.path.exists(before_path) and os.path.exists(after_path):
@@ -199,7 +271,9 @@ class FullTeethDataset(data.Dataset):
                 after = read_pointcloud(after_path)
                 after_points[i] = after[:512]
                 after_centroid[i] = after[512]
-        return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,masks
+                # before_points[i] = read_pointcloud(before_path)
+                # after_points[i] = read_pointcloud(after_path)
+        return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid, after_centroid,masks
         # return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,before_points_centered
 
 
