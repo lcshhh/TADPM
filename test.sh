@@ -1,6 +1,6 @@
 python test.py \
-	--checkpoint "/data/lcs/created_checkpoints/augmented/best_acc.pkl" \
-	--dataroot "/data/lcs/dataset/teeth_full/single_remesh_before_centered" \
+	--checkpoint "/data3/leics/checkpoints/mesh/diffusion/best_acc.pkl" \
+	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
 	--paramroot "/data/lcs/finetuned_teeth/transformed_after_param" \
 	--batch_size 16 --n_classes 40 \
 	--n_epoch 700 \
@@ -21,4 +21,3 @@ python test.py \
 	--dim 768 \
 	--use_pointnet \
 	--lower \
-	--use_mlp \

@@ -26,7 +26,7 @@ from scipy.spatial.transform import Rotation
 from einops import rearrange
 from pytorch3d.transforms import se3_exp_map,se3_log_map
 from pytorch3d.transforms import euler_angles_to_matrix
-from dataset.dataset import OriginalFullTeethDataManager, FullTeethDataManager
+from dataset.dataset import FullTeethDataset
 from models.tadpm import TADPM
 from util import progress_bar
 from models.utils import compute_rotation_matrix_from_ortho6d
@@ -91,8 +91,8 @@ def transform_teeth(index,centroid,output):
     meshes = []
     gt_meshes = []
     for i in range(32):
-        path = os.path.join('/data/lcs/dataset/teeth_full/single_normed_before',f'{index}_{i}.obj')
-        gt_path = os.path.join('/data/lcs/dataset/teeth_full/single_normed_after',f'{index}_{i}.obj')
+        path = os.path.join('/data3/leics/dataset/mesh/single_before',f'{index}_{i}.obj')
+        gt_path = os.path.join('/data3/leics/dataset/mesh/single_after',f'{index}_{i}.obj')
         if os.path.exists(path) and os.path.exists(gt_path):
             mesh = trimesh.load_mesh(path)
             gt_mesh = vedo.Mesh(gt_path)
@@ -105,10 +105,10 @@ def transform_teeth(index,centroid,output):
     mesh = vedo.merge(meshes)
     before_mesh = vedo.merge(before_meshes)
     gt_mesh = vedo.merge(gt_meshes)
-    vedo.write(mesh,'/data/lcs/after.obj')
-    vedo.write(before_mesh,'/data/lcs/before.obj')
-    vedo.write(gt_mesh,'/data/lcs/gt.obj')
-    exit()
+    os.makedirs('/data3/leics/outputs',exist_ok=True)
+    vedo.write(mesh,f'/data3/leics/outputs/after{index}.obj')
+    vedo.write(before_mesh,f'/data3/leics/outputs/before{index}.obj')
+    vedo.write(gt_mesh,f'/data3/leics/outputs/gt{index}.obj')
 
 
 # def chamfer_loss(before_points,after_points,centroids,outputs):
@@ -129,7 +129,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, dofs, masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
@@ -144,6 +144,9 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         n_samples += faces.shape[0]
         with torch.no_grad():
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32)
+            # print(outputs)
+            # print(dofs)
+            # exit()
             # for j in range(32):
             #     predicted_centroid = centroid[0,j] + outputs[0,j,:3]
             #     print('move:',outputs[0,j,:3])
@@ -153,7 +156,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
                 transform_teeth(index[i],centroid[i],outputs[i])
 
 if __name__ == '__main__':
-    seed_torch(seed=43)
+    # seed_torch(seed=43)
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', type=str, required=True)
     parser.add_argument('--optim', type=str, default='adam')
@@ -195,9 +198,11 @@ if __name__ == '__main__':
     # ========== Dataset ==========
     augments = []
     # dataManager = OriginalFullTeethDataManager(dataroot,paramroot,args.train_ratio,)
-    dataManager = OriginalFullTeethDataManager(dataroot,paramroot,args.train_ratio,)
-    train_dataset = dataManager.train_dataset()
-    test_dataset = dataManager.test_dataset()
+    # dataManager = OriginalFullTeethDataManager(dataroot,paramroot,args.train_ratio,)
+    # train_dataset = dataManager.train_dataset()
+    # test_dataset = dataManager.test_dataset()
+    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True)
+    test_dataset = FullTeethDataset(dataroot,paramroot,'val.txt',False)
     print(len(train_dataset))
     print(len(test_dataset))
     train_data_loader = data.DataLoader(train_dataset, num_workers=args.n_worker, batch_size=args.batch_size,
@@ -225,3 +230,4 @@ if __name__ == '__main__':
 
     # ========== Start Training ==========
     test(net, args.name, optimizer, scheduler, test_data_loader, 0, args)
+

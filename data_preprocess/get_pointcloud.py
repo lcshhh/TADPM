@@ -59,8 +59,8 @@ def read_pointcloud():
     xyz = np.asarray(pcd.points)
     return xyz
 
-dataroot = Path('/data/lcs/dataset/created/single_normed_before')
-outputroot = '/data/lcs/dataset/created/single_pointcloud_before512'   #
+dataroot = Path('/data3/leics/dataset/mesh/single_after')
+outputroot = '/data3/leics/dataset/mesh/single_pointcloud_after513'   #
 # with open('valid.txt') as f:
 #      indexes = [int(i.strip()) for i in f.readlines()]
 os.makedirs(outputroot,exist_ok=True)

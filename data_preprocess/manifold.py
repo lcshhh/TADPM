@@ -26,6 +26,8 @@ def manifold(obj_path,dataroot,output_root_manifold):
             raise Exception('wrong, command=%s, status=%s' % (commandm, status1))
 
 def simplify(obj_path,output_root_simplify,output_root_manifold):
+    if os.path.exists(output_root_simplify + '/' + obj_path.name):
+        return
     commands = '../Manifold/build/simplify -i ' + output_root_manifold + '/' + obj_path.name + ' -o ' + output_root_simplify + '/' + obj_path.name + ' -m -f ' + str(
                 256)
     try:
@@ -45,10 +47,10 @@ def quad_simplify(obj_path,output_root_simplify,output_root_manifold):
     mesh.export(os.path.join(output_root_simplify,obj_path.name))
 
 if __name__ == '__main__':
-    root = '/data/lcs/dataset/created/single_normed_before_centered'
+    root = '/data3/leics/dataset/mesh/single_before'
     dataroot = Path(root)
-    output_root_manifold = '/data/lcs/dataset/created/manifold_normed_before_centered'
-    output_root_simplify = '/data/lcs/dataset/created/simplified_normed_before_centered'
+    output_root_manifold = '/data3/leics/dataset/mesh/manifold_before'
+    output_root_simplify = '/data3/leics/dataset/mesh/simplify_before3'
     if not os.path.exists(output_root_manifold):
         os.mkdir(output_root_manifold)
     if not os.path.exists(output_root_simplify):
@@ -57,8 +59,8 @@ if __name__ == '__main__':
     for obj_path in dataroot.iterdir():
         if obj_path.is_file():    
             pool.apply_async(
-                quad_simplify,
-                (obj_path,output_root_simplify,output_root_manifold)
+                simplify,
+                (obj_path,output_root_simplify,output_root_manifold) 
             )
     pool.close()
     pool.join()

@@ -26,7 +26,7 @@ from scipy.spatial.transform import Rotation
 from einops import rearrange, repeat
 from pytorch3d.transforms import se3_exp_map,se3_log_map
 from pytorch3d.transforms import euler_angles_to_matrix
-from dataset.dataset import FullTeethDataManager
+from dataset.dataset import FullTeethDataset
 from models.tadpm import TADPM
 from models.utils import compute_rotation_matrix_from_ortho6d
 from util import progress_bar
@@ -71,7 +71,7 @@ def transform_vertices(vertices,centroids,dofs):
 #     loss, _ = chamfer_distance(after_points, predicted_points, point_reduction="mean", norm=1)
 #     return loss
 
-def chamfer_loss(before_points,after_points,outputs):
+def chamfer_loss(before_points,after_points,outputs,masks=None):
     '''
     outputs: [bs,16,6]
     before_points: [bs,16,2048,3]
@@ -92,7 +92,11 @@ def chamfer_loss(before_points,after_points,outputs):
     before_points = rearrange(before_points,'b n p c -> (b n) p c')
     after_points = rearrange(after_points,'b n p c -> (b n) p c')
     riged_tar = Transform3d(matrix=trans_matrix.transpose(1,2)).transform_points(before_points)
-    loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
+    if masks is not None:
+        loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", batch_reduction=None, norm=1)
+        loss = (loss * masks.view(loss.shape)).mean()
+    else:
+        loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
     return loss/bs
 
 # def centroid_loss(before_centroids,after_centroids,outputs,mask=None):
@@ -136,7 +140,7 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,dofs,masks) in enumerate(
             train_dataset):
         optim.zero_grad()
         faces = face_patch.to(torch.float32).cuda()
@@ -147,17 +151,24 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         centroid = centroid.to(torch.float32).cuda()
         after_centroid = after_centroid.to(torch.float32).cuda()
         # masks = (masks>0).cuda()
+        dofs = dofs.to(torch.float32).cuda()
         masks = masks.cuda()
         n_samples += faces.shape[0]
         before_points = before_points.to(torch.float32).cuda()
         after_points = after_points.to(torch.float32).cuda()
-        outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
-        loss1 = chamfer_loss(before_points,after_points,outputs)
-        loss2 = centroid_loss(centroid, after_centroid, outputs)
+        if args.use_mlp:
+            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
+        else:
+            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
+        loss1 = chamfer_loss(before_points,after_points,outputs, masks)
+        criterion = nn.MSELoss(reduction='none')
+        loss2 = criterion(dofs,outputs).sum(dim=-1)
+        loss2 = 300*(loss2 * masks).mean()
+        # loss2 = centroid_loss(centroid, after_centroid, outputs)
         # loss = chamfer_loss(before_points,after_points,outputs).mean()
-        print('loss1:',loss1)
-        print('loss2:',loss2)
-        loss = loss1 + loss2
+        # print('loss1:',loss1)
+        # print('loss2:',loss2)
+        loss = loss2 + loss1
         # print('centroid loss:',loss2)
         # loss = loss2
         loss.backward()
@@ -168,13 +179,13 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
     scheduler.step()
     epoch_loss = running_loss / n_samples
     message = 'epoch ({:}): {:} Train Loss: {:.4f}'.format(names, epoch, epoch_loss)
-    with open(os.path.join('/data/lcs/created_checkpoints', names, 'log.txt'), 'a') as f:
+    with open(os.path.join(args.saveroot, names, 'log.txt'), 'a') as f:
         f.write(message+'\n')
     print()
     print(message)
     if (epoch+1)%50 == 0:
         best_model_wts = copy.deepcopy(net.state_dict())
-        torch.save({'model':best_model_wts,'optim':optim.state_dict(),'scheduler':scheduler.state_dict(),'epoch':epoch}, os.path.join('/data/lcs/created_checkpoints', names, f'acc-{epoch_loss:.4f}-{epoch}.pkl'))
+        torch.save({'model':best_model_wts,'optim':optim.state_dict(),'scheduler':scheduler.state_dict(),'epoch':epoch}, os.path.join(args.saveroot, names, f'acc-{epoch_loss:.4f}-{epoch}.pkl'))
 
 def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencoder=None):
 
@@ -185,7 +196,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, dofs,masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
@@ -197,14 +208,18 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         centroid = centroid.to(torch.float32).cuda()
         after_centroid = after_centroid.to(torch.float32).cuda()
         # masks = (masks>0).cuda()
+        dofs = dofs.to(torch.float32).cuda()
         masks = masks.cuda()
         # trans_matrix = trans_matrix.to(torch.float32).cuda()
         n_samples += faces.shape[0]
         # trans_6dof = trans_6dof.to(torch.float32).cuda()
         with torch.no_grad():
-            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32)
+            if args.use_mlp:
+                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
+            else:
+                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
             # loss = 512*chamfer_loss(before_points,after_points,centroid, outputs, masks)
-            loss = chamfer_loss(before_points,after_points,outputs)
+            loss = chamfer_loss(before_points,after_points,outputs, masks)
             running_loss += loss.item() * faces.size(0)
             progress_bar(it, len(test_dataset), 'Test Loss: %.3f'% (running_loss/n_samples))
 
@@ -212,11 +227,11 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     if test.best_loss > epoch_loss:
         test.best_loss = epoch_loss
         best_model_wts = copy.deepcopy(net.state_dict())
-        torch.save({'model':best_model_wts,'optim':optimizer.state_dict(),'scheduler':scheduler.state_dict(),'epoch':epoch}, os.path.join('/data/lcs/created_checkpoints', names, 'best_acc.pkl'))
+        torch.save({'model':best_model_wts,'optim':optimizer.state_dict(),'scheduler':scheduler.state_dict(),'epoch':epoch}, os.path.join(args.saveroot, names, 'best_acc.pkl'))
         # torch.save(best_model_wts, os.path.join('/data/lcs/created_checkpoints', names, 'best_acc.pkl'))
 
     message = 'epoch ({:}): {:} test Loss: {:.4f}'.format(names, epoch, epoch_loss)
-    with open(os.path.join('/data/lcs/created_checkpoints', names, 'log.txt'), 'a') as f:
+    with open(os.path.join(args.saveroot, names, 'log.txt'), 'a') as f:
         f.write(message+'\n')
     print()
     print(message)
@@ -243,6 +258,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_epoch', type=int, required=True, default=500)
     parser.add_argument('--dataroot', type=str, required=True)
     parser.add_argument('--n_classes', type=int)
+    parser.add_argument('--saveroot', type=str, required=True)
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--n_worker', type=int, default=8)
     parser.add_argument('--paramroot',type=str, required=True)
@@ -264,9 +280,11 @@ if __name__ == '__main__':
 
     # ========== Dataset ==========
     augments = []
-    dataManager = FullTeethDataManager(dataroot,paramroot,args.train_ratio,)
-    train_dataset = dataManager.train_dataset()
-    test_dataset = dataManager.test_dataset()
+    # dataManager = FullTeethDataManager(dataroot,paramroot,args.train_ratio,)
+    # train_dataset = dataManager.train_dataset()
+    # test_dataset = dataManager.test_dataset()
+    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True)
+    test_dataset = FullTeethDataset(dataroot,paramroot,'val.txt',False)
     print(len(train_dataset))
     print(len(test_dataset))
     train_data_loader = data.DataLoader(train_dataset, num_workers=args.n_worker, batch_size=args.batch_size,
@@ -280,14 +298,12 @@ if __name__ == '__main__':
         checkpoint = torch.load(args.checkpoint)
         net.load_state_dict(checkpoint['model'],strict=True)
     print("Let's use", torch.cuda.device_count(), "GPUs!")
-    # if args.mode != 'train':
     
-
     # ========== Optimizer ==========
     optimizer = optim.Adam(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.n_epoch)
     checkpoint_names = []
-    checkpoint_path = os.path.join('/data/lcs/created_checkpoints', args.name)
+    checkpoint_path = os.path.join(args.saveroot, args.name)
 
     os.makedirs(checkpoint_path, exist_ok=True)
 

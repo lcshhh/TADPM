@@ -56,12 +56,29 @@ def merge_mesh(index):
     mesh = vedo.merge(meshes)
     vedo.write(mesh,f'/data/lcs/dataset/{index}.obj')
 
-mesh = trimesh.load_mesh('/data/lcs/dataset/created/single_normed_before/2_3.obj')
-mesh.export('/data/lcs/dataset/before.obj')
-paramroot = Path('/data/lcs/dataset/created/params')
-dof = torch.load(os.path.join(paramroot,f'6dof_{2}.pkl')).float()
-predicetd_mesh = transform_mesh(mesh,dof[3])
-predicetd_mesh.export('/data/lcs/dataset/after.obj')
-gt_mesh = trimesh.load_mesh('/data/lcs/dataset/created/single_normed_after/2_3.obj')
-gt_mesh.export('/data/lcs/dataset/gt.obj')
+paramroot = '/data3/leics/dataset/mesh/param'
+
+# dof = torch.load(os.path.join(paramroot,f'1014.pkl')).float()
+# meshes = []
+# before_meshes = []
+# for i in range(32):
+#     path = f'/data3/leics/dataset/mesh/single_before/1014_{i}.obj'
+#     if not os.path.exists(path):
+#         continue
+#     mesh = trimesh.load_mesh(f'/data3/leics/dataset/mesh/single_before/1014_{i}.obj')
+#     before_mesh = trimesh.load_mesh(path)
+#     predicetd_mesh = transform_mesh(mesh,dof[i])
+#     meshes.append(vedo.trimesh2vedo(predicetd_mesh))
+#     before_meshes.append(vedo.trimesh2vedo(before_mesh))
+#     # predicetd_mesh.export('/data/lcs/dataset/after.obj')
+#     # gt_mesh = trimesh.load_mesh('/data/lcs/dataset/created/single_normed_after/2_3.obj')
+#     # gt_mesh.export('/data/lcs/dataset/gt.obj')
+# mesh = vedo.merge(meshes)
+# before_mesh = vedo.merge(before_meshes)
+# vedo.write(mesh,'/data3/leics/dataset/mesh/after.obj')
+# vedo.write(before_mesh,'/data3/leics/dataset/mesh/before.obj')
 # merge_mesh(177)
+path = Path(paramroot)
+for pkl in path.iterdir():
+    dof = torch.load(os.path.join(paramroot,f'1014.pkl')).float()
+    print(dof)

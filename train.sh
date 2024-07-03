@@ -1,10 +1,10 @@
 python train.py train \
-	--encoder_checkpoint "/data/lcs/TADPM_checkpoints/single_meshmae_test/loss-0.0027-299.pkl" \
-	--dataroot "/data/lcs/dataset/created/remesh_normed_before_centered" \
-	--paramroot "/data/lcs/finetuned_teeth/transformed_after_param" \
+	--encoder_checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
+	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
+	--paramroot "/data3/leics/dataset/mesh/param" \
 	--batch_size 16 --n_classes 40 \
 	--n_epoch 700 \
-	--name "augmented" \
+	--name "diffusion" \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \
@@ -21,4 +21,4 @@ python train.py train \
 	--dim 768 \
 	--use_pointnet \
 	--lower \
-	--use_mlp \
+	--saveroot "/data3/leics/checkpoints/mesh" \
