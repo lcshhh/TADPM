@@ -153,7 +153,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
             #     print(predicted_centroid)
             #     print(after_centroid[0,j])
             for i in range(index.shape[0]):
-                transform_teeth(index[i],centroid[i],outputs[i])
+                transform_teeth(index[i],centroid[i],outputs[i]/10)
 
 if __name__ == '__main__':
     # seed_torch(seed=43)

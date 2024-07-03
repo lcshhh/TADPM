@@ -150,7 +150,6 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         cordinates = coordinate_patch.cuda()
         centroid = centroid.to(torch.float32).cuda()
         after_centroid = after_centroid.to(torch.float32).cuda()
-        # masks = (masks>0).cuda()
         dofs = dofs.to(torch.float32).cuda()
         masks = masks.cuda()
         n_samples += faces.shape[0]
@@ -160,9 +159,9 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
         else:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
-        loss1 = chamfer_loss(before_points,after_points,outputs, masks)
+        loss1 = chamfer_loss(before_points,after_points,outputs/10, masks)
         criterion = nn.MSELoss(reduction='none')
-        loss2 = criterion(dofs,outputs).sum(dim=-1)
+        loss2 = criterion(dofs,outputs/10).sum(dim=-1)
         loss2 = 300*(loss2 * masks).mean()
         # loss2 = centroid_loss(centroid, after_centroid, outputs)
         # loss = chamfer_loss(before_points,after_points,outputs).mean()
@@ -219,7 +218,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
             else:
                 outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
             # loss = 512*chamfer_loss(before_points,after_points,centroid, outputs, masks)
-            loss = chamfer_loss(before_points,after_points,outputs, masks)
+            loss = chamfer_loss(before_points,after_points,outputs/10, masks)
             running_loss += loss.item() * faces.size(0)
             progress_bar(it, len(test_dataset), 'Test Loss: %.3f'% (running_loss/n_samples))
 

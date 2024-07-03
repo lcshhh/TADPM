@@ -62,7 +62,7 @@ def get_mesh(dataroot,outputroot_before,outputroot_after,paramroot,index,num):
     trans_matrix = torch.inverse(trans)
     torch.save(trans_matrix,os.path.join(paramroot,f'matrix_{num}.pkl'))
     dofs_gt = se3_log_map(trans_matrix.transpose(1,2))
-    torch.save(dofs_gt,os.path.join(paramroot,f'{num}.pkl'))
+    torch.save(dofs_gt,os.path.join(paramroot,f'6dof_{num}.pkl'))
     
 
 # dataroot = Path('/data/lcs/first_upper/upper_centered_normed')
@@ -91,23 +91,23 @@ def get_mesh(dataroot,outputroot_before,outputroot_after,paramroot,index,num):
 #         )
 # pool.close()
 # pool.join()
-dataroot = Path('/data3/leics/dataset/mesh/single_before')
-outputroot_before = Path('/data3/leics/dataset/created/single_before')
+dataroot = Path('/data/lcs/dataset/teeth_full/single_normed_after')
+outputroot_before = Path('/data/lcs/dataset/created/single_normed_before')
 os.makedirs(outputroot_before,exist_ok=True)
-outputroot_after = Path('/data3/leics/dataset/created/single_after')
+outputroot_after = Path('/data/lcs/dataset/created/single_normed_after')
 os.makedirs(outputroot_after,exist_ok=True)
-paramroot = Path('/data3/leics/dataset/created/params')
+paramroot = Path('/data/lcs/dataset/created/params')
 os.makedirs(paramroot,exist_ok=True)
 with open('train.txt') as f:
      indexes = [int(i.strip()) for i in f.readlines()]
 pool = Pool(processes=64)
-n_variance = 10
+n_variance = 5
 for i in range(n_variance):
 # if True:
     # num = len(glob(os.path.join(outputroot,f'*.vtp')))//2
     for j,index in enumerate(indexes):
             # obj = os.path.join(dataroot,f'{i}_after_lower.vtp')
-            num = i * len(indexes) + j
+            num = i * 821 + j
             pool.apply_async(
                 get_mesh,
                 (dataroot,outputroot_before,outputroot_after,paramroot,index,num)
