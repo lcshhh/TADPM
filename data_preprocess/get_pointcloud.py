@@ -45,13 +45,15 @@ def get_pointcloud(outputroot,obj,indexes):
 
 def get_pointcloud_with_center(outputroot,obj):
     index = int(obj.name.split('_')[0])
+    new_name = obj.name.split('.')[0]+'.ply'
+    if os.path.exists(os.path.join(outputroot,new_name)):
+         return
     point_num = 512
     mesh = trimesh.load_mesh(obj)
     points = farthest_point_sample(mesh.vertices,point_num)
     points = np.concatenate([points,torch.tensor(mesh.centroid).unsqueeze(0).numpy()],axis=0)
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
-    new_name = obj.name.split('.')[0]+'.ply'
     o3d.io.write_point_cloud(os.path.join(outputroot,new_name), pcd)
 
 def read_pointcloud():
@@ -59,8 +61,8 @@ def read_pointcloud():
     xyz = np.asarray(pcd.points)
     return xyz
 
-dataroot = Path('/data3/leics/dataset/mesh/single_after')
-outputroot = '/data3/leics/dataset/mesh/single_pointcloud_after513'   #
+dataroot = Path('/data3/leics/dataset/created/single_before')
+outputroot = '/data3/leics/dataset/created/single_pointcloud_before513'   #
 # with open('valid.txt') as f:
 #      indexes = [int(i.strip()) for i in f.readlines()]
 os.makedirs(outputroot,exist_ok=True)

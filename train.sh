@@ -1,7 +1,7 @@
 python train.py train \
 	--encoder_checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
-	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
-	--paramroot "/data3/leics/dataset/mesh/param" \
+	--dataroot "/data3/leics/dataset/created/remesh_before" \
+	--paramroot "/data3/leics/dataset/created/params" \
 	--batch_size 32 --n_classes 40 \
 	--n_epoch 700 \
 	--name "diffusion4e-4" \
@@ -22,4 +22,3 @@ python train.py train \
 	--use_pointnet \
 	--lower \
 	--saveroot "/data3/leics/checkpoints/mesh" \
-	--use_mlp \

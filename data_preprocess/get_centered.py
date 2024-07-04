@@ -32,7 +32,7 @@ outputroot = '/data/lcs/dataset/created/single_normed_after_centered'   #
 os.makedirs(outputroot,exist_ok=True)
 pool = Pool(processes=64)
 for path in dataroot.iterdir():
-    pool.apply_async(
+    pool.apply_async(    
         single_center,
         (dataroot,outputroot,path)
     )

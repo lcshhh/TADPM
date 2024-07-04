@@ -90,6 +90,26 @@ def chamfer_loss(before_points,after_points,outputs,masks=None):
         loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
     return loss/bs
 
+def chamfer_loss2(index,outputs):
+    bs = index.shape[0]
+    loss = torch.FloatTensor([0.]).cuda()
+    for j in range(bs):
+        trans_matrix = se3_exp_map(outputs[j]).transpose(1,2)
+        for i in range(32):
+            before_path = os.path.join('/data3/leics/dataset/mesh/single_before',f'{index[j]}_{i}.obj')
+            after_path = os.path.join('/data3/leics/dataset/mesh/single_after',f'{index[j]}_{i}.obj')
+            if os.path.exists(before_path) and os.path.exists(after_path):
+                before_mesh = trimesh.load_mesh(before_path)
+                after_mesh = trimesh.load_mesh(after_path)
+                before_points = torch.FloatTensor(before_mesh.vertices).cuda()
+                after_points = torch.FloatTensor(after_mesh.vertices).cuda()
+                predicted_points = Transform3d(matrix=trans_matrix.transpose(1,2)[i]).transform_points(before_points)
+                cd_loss,_ = chamfer_distance(after_points.unsqueeze(0), predicted_points.unsqueeze(0), point_reduction="sum", norm=1)
+                loss += cd_loss
+    return loss/bs
+    
+            
+
 def add_loss(before_points,after_points,outputs,masks=None):
     bs = before_points.shape[0]
     loss = torch.FloatTensor([0]).cuda()
@@ -168,7 +188,8 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
         else:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
-        loss1 = chamfer_loss(before_points,after_points,outputs/10, masks)
+        # loss1 = chamfer_loss(before_points,after_points,outputs/10, masks)
+        loss1 = chamfer_loss2(index,outputs/10)
         criterion = nn.MSELoss(reduction='none')
         loss2 = criterion(dofs,outputs/10).sum(dim=-1)
         loss2 = 30*(loss2 * masks).sum()
