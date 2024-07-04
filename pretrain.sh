@@ -1,9 +1,10 @@
 python pretrain.py train \
-	--dataroot "/data/lcs/dataset/mesh/remesh" \
+	--dataroot "/data3/leics/dataset/created/single_before" \
+	--checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
 	--batch_size 64 \
 	--augment_scale --augment_orient --n_epoch 700 \
 	--num_warmup_steps 2 \
-	--name "single_no_center" \
+	--name "single_no_center_augmented" \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \
@@ -17,5 +18,5 @@ python pretrain.py train \
 	--decoder_depth 6 \
 	--decoder_dim 512 \
 	--decoder_num_heads 16 \
-	--saveroot "/data/lcs/checkpoints/mesh" \
+	--saveroot "/data3/leics/checkpoints/meshmae" \
 	--dim 768

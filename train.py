@@ -78,15 +78,6 @@ def chamfer_loss(before_points,after_points,outputs,masks=None):
     '''
     bs = before_points.shape[0]
     loss = torch.FloatTensor([0]).cuda()
-    # for i in range(bs):
-    #     trans_matrix = se3_exp_map(outputs[i]).transpose(1,2)      # [16,4,4]    
-    #     riged_tar = Transform3d(matrix=trans_matrix.transpose(1,2)).transform_points(before_points[i])
-    #     # N,P,C = before_points.shape
-    #     # before_points_pre = torch.cat([before_points[i],torch.ones(N,P,1).cuda()],dim=-1).permute(0,2,1)
-    #     # riged_tar = torch.bmm(trans_matrix,before_points_pre).permute(0,2,1)
-    #     # riged_tar = riged_tar[:,:,:3]
-    #     tmp,_ = chamfer_distance(after_points[i], riged_tar, point_reduction="sum", norm=1)
-    #     loss += tmp
     outputs = rearrange(outputs,'b n c -> (b n) c')
     trans_matrix = se3_exp_map(outputs).transpose(1,2)
     before_points = rearrange(before_points,'b n p c -> (b n) p c')
@@ -97,6 +88,24 @@ def chamfer_loss(before_points,after_points,outputs,masks=None):
         loss = (loss * masks.view(loss.shape)).mean()
     else:
         loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
+    return loss/bs
+
+def add_loss(before_points,after_points,outputs,masks=None):
+    bs = before_points.shape[0]
+    loss = torch.FloatTensor([0]).cuda()
+    outputs = rearrange(outputs,'b n c -> (b n) c')
+    trans_matrix = se3_exp_map(outputs).transpose(1,2)
+    before_points = rearrange(before_points,'b n p c -> (b n) p c')
+    after_points = rearrange(after_points,'b n p c -> (b n) p c')
+    riged_tar = Transform3d(matrix=trans_matrix.transpose(1,2)).transform_points(before_points)
+    criterion = nn.MSELoss(reduction='none')
+    # if masks is not None:
+    #     loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", batch_reduction=None, norm=1)
+    #     loss = (loss * masks.view(loss.shape)).mean()
+    # else:
+    #     loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
+    loss = criterion(after_points,riged_tar).sum(dim=(1,2))
+    loss = (loss * masks.view(loss.shape)).sum()
     return loss/bs
 
 # def centroid_loss(before_centroids,after_centroids,outputs,mask=None):
@@ -159,14 +168,14 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
         else:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
-        loss1 = chamfer_loss(before_points,after_points,outputs/10, masks)
+        loss1 = add_loss(before_points,after_points,outputs/10, masks)
         criterion = nn.MSELoss(reduction='none')
         loss2 = criterion(dofs,outputs/10).sum(dim=-1)
-        loss2 = 300*(loss2 * masks).mean()
+        loss2 = 30*(loss2 * masks).sum()
         # loss2 = centroid_loss(centroid, after_centroid, outputs)
         # loss = chamfer_loss(before_points,after_points,outputs).mean()
-        # print('loss1:',loss1)
-        # print('loss2:',loss2)
+        print('loss1:',loss1)
+        print('loss2:',loss2)
         loss = loss2 + loss1
         # print('centroid loss:',loss2)
         # loss = loss2
@@ -255,6 +264,7 @@ if __name__ == '__main__':
     parser.add_argument('--patch_size', type=int, required=True)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--n_epoch', type=int, required=True, default=500)
+    parser.add_argument('--max_epoch', type=int, default=300)
     parser.add_argument('--dataroot', type=str, required=True)
     parser.add_argument('--n_classes', type=int)
     parser.add_argument('--saveroot', type=str, required=True)
@@ -299,8 +309,19 @@ if __name__ == '__main__':
     print("Let's use", torch.cuda.device_count(), "GPUs!")
     
     # ========== Optimizer ==========
-    optimizer = optim.Adam(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.n_epoch)
+    # optimizer = optim.Adam(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.n_epoch)
+    if args.optim.lower() == 'adamw':
+        optimizer = optim.AdamW(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+
+    if args.lr_milestones.lower() != 'none':
+        ms = args.lr_milestones
+        ms = ms.split()
+        ms = [int(j) for j in ms]
+        scheduler = MultiStepLR(optimizer, milestones=ms, gamma=0.1)
+    else:
+        scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=int(args.num_warmup_steps),
+                                                    num_training_steps=args.n_epoch + 1)
     checkpoint_names = []
     checkpoint_path = os.path.join(args.saveroot, args.name)
 

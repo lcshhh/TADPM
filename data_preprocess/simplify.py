@@ -39,7 +39,15 @@ def simplify(obj_path,output_root_simplify,output_root_manifold):
             raise Exception('wrong, command=%s, status=%s' % (commands, status))
 
 def quad_simplify(obj_path,output_root_simplify,output_root_manifold):
-    mesh = trimesh.load_mesh(os.path.join(output_root_manifold,obj_path.name))
+    # if os.path.exists(os.path.join(output_root_simplify,obj_path.name)):
+    #     return
+    # mesh = vedo.Mesh(os.path.join(output_root_manifold,obj_path.name))
+    try:
+        mesh = trimesh.load_mesh(os.path.join(output_root_manifold,obj_path.name))
+    except:
+        print(os.path.join(output_root_manifold,obj_path.name))
+    mesh = vedo.vedo2trimesh(mesh)
+    # mesh = trimesh.load_mesh(os.path.join(output_root_manifold,obj_path.name))
     mesh_simplifier = pyfqmr.Simplify()
     mesh_simplifier.setMesh(mesh.vertices, mesh.faces)
     mesh_simplifier.simplify_mesh(target_count = 256, aggressiveness=7, preserve_border=True, verbose=10)
@@ -61,8 +69,9 @@ if __name__ == '__main__':
     for obj_path in dataroot.iterdir():
         if obj_path.is_file():    
             pool.apply_async(
-                manifold,
+                quad_simplify,
                 (obj_path,output_root_simplify,output_root_manifold) 
             )
+            # quad_simplify(obj_path,output_root_simplify,output_root_manifold)
     pool.close()
     pool.join()

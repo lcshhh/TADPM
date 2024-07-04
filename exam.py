@@ -19,7 +19,11 @@ import torch.nn.functional as F
 import numpy as np
 import trimesh
 import vedo
-mesh = vedo.Mesh('/data/lcs/dataset/teeth_full/centered_before/1.vtp')
-mesh = vedo.vedo2trimesh(mesh)
-m = np.max(np.sqrt(np.sum(mesh.vertices ** 2, axis=1)))
-print(m)
+from einops import rearrange
+# mesh = vedo.Mesh('/data/lcs/dataset/teeth_full/centered_before/1.vtp')
+# mesh = vedo.vedo2trimesh(mesh)
+# m = np.max(np.sqrt(np.sum(mesh.vertices ** 2, axis=1)))
+a = torch.rand(32,32)
+b = rearrange(a,'a b -> (a b)')
+c = a.view(b.shape)
+print(b-c)

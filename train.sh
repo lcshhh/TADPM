@@ -8,7 +8,7 @@ python train.py train \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \
-	--lr 1e-3 \
+	--lr 4e-4 \
 	--weight 0.5 \
 	--depth 12 \
 	--heads 12 \

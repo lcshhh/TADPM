@@ -63,6 +63,24 @@ def get_mesh(dataroot,outputroot_before,outputroot_after,paramroot,index,num):
     torch.save(trans_matrix,os.path.join(paramroot,f'matrix_{num}.pkl'))
     dofs_gt = se3_log_map(trans_matrix.transpose(1,2))
     torch.save(dofs_gt,os.path.join(paramroot,f'{num}.pkl'))
+
+def get_mesh2(dataroot,outputroot_before,outputroot_after,paramroot,index,num):
+    seed_torch(num)
+    dofs = torch.cat([torch.normal(mean=0.,std=0.02,size=(32,3)),torch.normal(mean=0.,std=0.05,size=(32,3))],dim=1)
+    trans = se3_exp_map(dofs).transpose(1,2)
+    ran = range(32)
+    for i in ran:
+        path = os.path.join(dataroot,f'{index}_{i}.obj')
+        remesh_path = os.path.join('',f'')
+        if os.path.exists(path):
+            mesh = trimesh.load_mesh(path)
+            mesh.export(os.path.join(outputroot_after,f'{num}_{i}.obj'))
+            mesh.apply_transform(trans[i])
+            mesh.export(os.path.join(outputroot_before,f'{num}_{i}.obj'))
+    trans_matrix = torch.inverse(trans)
+    torch.save(trans_matrix,os.path.join(paramroot,f'matrix_{num}.pkl'))
+    dofs_gt = se3_log_map(trans_matrix.transpose(1,2))
+    torch.save(dofs_gt,os.path.join(paramroot,f'{num}.pkl'))
     
 
 # dataroot = Path('/data/lcs/first_upper/upper_centered_normed')

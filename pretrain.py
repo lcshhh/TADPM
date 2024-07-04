@@ -12,6 +12,7 @@ import torch.utils.data as data
 from dataset.dataset import teethDataset,TeethDataManager
 from models.mesh_mae import Mesh_mae
 import torch.backends.cudnn as cudnn
+from collections import OrderedDict
 from transformers import AdamW, get_linear_schedule_with_warmup, get_constant_schedule, get_cosine_schedule_with_warmup
 import time
 
@@ -144,11 +145,16 @@ if __name__ == '__main__':
                    weight=args.weight
                    ).to(device)
     print("using data parallel")
-    net = torch.nn.DataParallel(net)
     if args.checkpoint != '':
-        print(args.checkpoint)
-        net.load_state_dict(torch.load(args.checkpoint)['model'], strict=True)
+        checkpoint = torch.load(args.checkpoint)['model']
+        new_state_dict = OrderedDict()
+        for k, v in checkpoint.items():
+            name = k.replace('module.', '')
+            new_state_dict[name] = v
+        net.load_state_dict(new_state_dict, strict=True)
+        # net.load_state_dict(torch.load(args.checkpoint)['model'], strict=True)
         cudnn.benchmark = True
+    net = torch.nn.DataParallel(net)
 
     # ========== Optimizer ==========
     if args.optim.lower() == 'adamw':

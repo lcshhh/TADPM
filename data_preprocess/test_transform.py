@@ -8,6 +8,7 @@ from pathlib import Path
 import torch
 from multiprocessing import Pool
 from pytorch3d.transforms import *
+from pytorch3d.loss import chamfer_distance
 import random
 import scipy
 import trimesh
@@ -58,27 +59,32 @@ def merge_mesh(index):
 
 paramroot = '/data3/leics/dataset/mesh/param'
 
-# dof = torch.load(os.path.join(paramroot,f'1014.pkl')).float()
-# meshes = []
-# before_meshes = []
-# for i in range(32):
-#     path = f'/data3/leics/dataset/mesh/single_before/1014_{i}.obj'
-#     if not os.path.exists(path):
-#         continue
-#     mesh = trimesh.load_mesh(f'/data3/leics/dataset/mesh/single_before/1014_{i}.obj')
-#     before_mesh = trimesh.load_mesh(path)
-#     predicetd_mesh = transform_mesh(mesh,dof[i])
-#     meshes.append(vedo.trimesh2vedo(predicetd_mesh))
-#     before_meshes.append(vedo.trimesh2vedo(before_mesh))
-#     # predicetd_mesh.export('/data/lcs/dataset/after.obj')
-#     # gt_mesh = trimesh.load_mesh('/data/lcs/dataset/created/single_normed_after/2_3.obj')
-#     # gt_mesh.export('/data/lcs/dataset/gt.obj')
-# mesh = vedo.merge(meshes)
-# before_mesh = vedo.merge(before_meshes)
-# vedo.write(mesh,'/data3/leics/dataset/mesh/after.obj')
-# vedo.write(before_mesh,'/data3/leics/dataset/mesh/before.obj')
+def cal_add(mesh1,mesh2):
+    add = torch.square(torch.FloatTensor(mesh1.vertices - mesh2.vertices)).sum()
+    return add
+
+dof = torch.load(os.path.join(paramroot,f'1014.pkl')).float()
+meshes = []
+before_meshes = []
+gt_meshes = []
+for i in range(32):
+    path = f'/data3/leics/dataset/mesh/single_before/1014_{i}.obj'
+    if not os.path.exists(path):
+        continue
+    mesh = trimesh.load_mesh(f'/data3/leics/dataset/mesh/single_before/1014_{i}.obj')
+    gt_mesh = trimesh.load_mesh(f'/data3/leics/dataset/mesh/single_after/1014_{i}.obj')
+    before_mesh = trimesh.load_mesh(path)
+    predicted_mesh = transform_mesh(mesh,dof[i])
+    add = cal_add(predicted_mesh,gt_mesh)
+    print(add)
+    meshes.append(vedo.trimesh2vedo(predicted_mesh))
+    before_meshes.append(vedo.trimesh2vedo(before_mesh))
+    gt_meshes.append(vedo.trimesh2vedo(gt_mesh))
+    
+mesh = vedo.merge(meshes)
+before_mesh = vedo.merge(before_meshes)
+gt_mesh = vedo.merge(gt_meshes)
+vedo.write(mesh,'/data3/leics/dataset/mesh/after.obj')
+vedo.write(before_mesh,'/data3/leics/dataset/mesh/before.obj')
+vedo.write(gt_mesh,'/data3/leics/dataset/mesh/gt.obj')
 # merge_mesh(177)
-path = Path(paramroot)
-for pkl in path.iterdir():
-    dof = torch.load(os.path.join(paramroot,f'1014.pkl')).float()
-    print(dof)
