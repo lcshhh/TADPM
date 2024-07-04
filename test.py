@@ -135,6 +135,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         feats = feats_patch.to(torch.float32).cuda()
         centers = center_patch.to(torch.float32).cuda()
         Fs = np_Fs.cuda()
+        dofs = dofs.to(torch.float32).cuda()
         cordinates = coordinate_patch.to(torch.float32).cuda()
         before_points = before_points.to(torch.float32).cuda()
         after_points = after_points.to(torch.float32).cuda()

@@ -22,3 +22,4 @@ python train.py train \
 	--use_pointnet \
 	--lower \
 	--saveroot "/data3/leics/checkpoints/mesh" \
+	--use_mlp \

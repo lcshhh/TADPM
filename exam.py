@@ -20,10 +20,18 @@ import numpy as np
 import trimesh
 import vedo
 from einops import rearrange
+from pathlib import Path
+import os
 # mesh = vedo.Mesh('/data/lcs/dataset/teeth_full/centered_before/1.vtp')
 # mesh = vedo.vedo2trimesh(mesh)
 # m = np.max(np.sqrt(np.sum(mesh.vertices ** 2, axis=1)))
-a = torch.rand(32,32)
-b = rearrange(a,'a b -> (a b)')
-c = a.view(b.shape)
-print(b-c)
+outputroot_before = Path('/data3/leics/dataset/created/single_before')
+meshes = []
+for i in range(32):
+    path = os.path.join(outputroot_before,f'0_{i}.obj')
+    if not os.path.exists(path):
+        continue
+    mesh = vedo.Mesh(path)
+    meshes.append(mesh)
+mesh = vedo.merge(meshes)
+vedo.write(mesh,'/data3/leics/dataset/created/0.obj')

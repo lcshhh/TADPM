@@ -57,25 +57,25 @@ def merge_mesh(index):
     mesh = vedo.merge(meshes)
     vedo.write(mesh,f'/data/lcs/dataset/{index}.obj')
 
-paramroot = '/data3/leics/dataset/mesh/param'
+paramroot = '/data3/leics/dataset/created/params'
 
 def cal_add(mesh1,mesh2):
     add = torch.square(torch.FloatTensor(mesh1.vertices - mesh2.vertices)).sum()
     return add
 
-dof = torch.load(os.path.join(paramroot,f'1014.pkl')).float()
+dof = torch.load(os.path.join(paramroot,f'0.pkl')).float()
 meshes = []
 before_meshes = []
 gt_meshes = []
 for i in range(32):
-    path = f'/data3/leics/dataset/mesh/single_before/1014_{i}.obj'
+    path = f'/data3/leics/dataset/created/single_before/0_{i}.obj'
     if not os.path.exists(path):
         continue
-    mesh = trimesh.load_mesh(f'/data3/leics/dataset/mesh/single_before/1014_{i}.obj')
-    gt_mesh = trimesh.load_mesh(f'/data3/leics/dataset/mesh/single_after/1014_{i}.obj')
+    mesh = trimesh.load_mesh(f'/data3/leics/dataset/created/single_before/0_{i}.obj')
+    gt_mesh = trimesh.load_mesh(f'/data3/leics/dataset/created/single_after/0_{i}.obj')
     before_mesh = trimesh.load_mesh(path)
     predicted_mesh = transform_mesh(mesh,dof[i])
-    add = cal_add(predicted_mesh,gt_mesh)
+    add = cal_add(predicted_mesh,before_mesh)
     print(add)
     meshes.append(vedo.trimesh2vedo(predicted_mesh))
     before_meshes.append(vedo.trimesh2vedo(before_mesh))
@@ -84,7 +84,7 @@ for i in range(32):
 mesh = vedo.merge(meshes)
 before_mesh = vedo.merge(before_meshes)
 gt_mesh = vedo.merge(gt_meshes)
-vedo.write(mesh,'/data3/leics/dataset/mesh/after.obj')
-vedo.write(before_mesh,'/data3/leics/dataset/mesh/before.obj')
-vedo.write(gt_mesh,'/data3/leics/dataset/mesh/gt.obj')
+vedo.write(mesh,'/data3/leics/dataset/created/after.obj')
+vedo.write(before_mesh,'/data3/leics/dataset/created/before.obj')
+vedo.write(gt_mesh,'/data3/leics/dataset/created/gt.obj')
 # merge_mesh(177)

@@ -85,7 +85,7 @@ def chamfer_loss(before_points,after_points,outputs,masks=None):
     riged_tar = Transform3d(matrix=trans_matrix.transpose(1,2)).transform_points(before_points)
     if masks is not None:
         loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", batch_reduction=None, norm=1)
-        loss = (loss * masks.view(loss.shape)).mean()
+        loss = (loss * masks.view(loss.shape)).sum()
     else:
         loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
     return loss/bs
@@ -168,7 +168,7 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
         else:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
-        loss1 = add_loss(before_points,after_points,outputs/10, masks)
+        loss1 = chamfer_loss(before_points,after_points,outputs/10, masks)
         criterion = nn.MSELoss(reduction='none')
         loss2 = criterion(dofs,outputs/10).sum(dim=-1)
         loss2 = 30*(loss2 * masks).sum()
