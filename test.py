@@ -181,6 +181,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_worker', type=int, default=8)
     parser.add_argument('--paramroot',type=str, required=True)
     parser.add_argument('--encoder_checkpoint',type=str,default='')
+    parser.add_argument('--before_path',type=str, required=True)
+    parser.add_argument('--after_path',type=str, required=True)
     parser.add_argument('--checkpoint',type=str,default='')
     parser.add_argument('--use_mlp', action='store_true')
     parser.add_argument('--use_pointnet', action='store_true')
@@ -202,8 +204,10 @@ if __name__ == '__main__':
     # dataManager = OriginalFullTeethDataManager(dataroot,paramroot,args.train_ratio,)
     # train_dataset = dataManager.train_dataset()
     # test_dataset = dataManager.test_dataset()
-    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True)
-    test_dataset = FullTeethDataset(dataroot,paramroot,'val.txt',False)
+    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,512)
+    args.before_path = '/data3/leics/dataset/mesh/single_pointcloud_before2049'
+    args.after_path = '/data3/leics/dataset/mesh/single_pointcloud_after2049'
+    test_dataset = FullTeethDataset(dataroot,'/data3/leics/dataset/mesh/param','val.txt',False,args,2048)
     print(len(train_dataset))
     print(len(test_dataset))
     train_data_loader = data.DataLoader(train_dataset, num_workers=args.n_worker, batch_size=args.batch_size,

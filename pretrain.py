@@ -185,7 +185,7 @@ if __name__ == '__main__':
     if args.mode == 'train':
         for epoch in range(args.n_epoch):
             print('epoch', epoch)
-            train(net, optim, scheduler, args.name, train_data_loader, epoch, args)
+            # train(net, optim, scheduler, args.name, train_data_loader, epoch, args)
             print('train finished')
             test(net, optim, scheduler, args.name, train_data_loader, epoch, args)
             print('test finished')

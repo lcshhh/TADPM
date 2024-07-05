@@ -14,24 +14,29 @@ def exam(path):
     except:
         print(path)
 
-# pool = Pool(processes=32)
-# outputroot_before = Path('/data3/leics/dataset/created/remesh_before')
-# for path in outputroot_before.iterdir():
-#     # pool.apply_async(
-#     #     exam(path)
-#     # )
-#     exam(path)
+pool = Pool(processes=32)
+outputroot_before = Path('/data3/leics/dataset/created/remesh_before')
+indexes = set()
+for path in outputroot_before.iterdir():
+    # pool.apply_async(
+    #     exam(path)
+    # )
+    index = int(path.name.split('_')[0])
+    indexes.add(index)
 # pool.close()
 # pool.join()
-with open('wrong.txt') as f:
-    lines = f.readlines()
-for line in lines:
-    try:
-        mesh = trimesh.load_mesh(Path(f'/data3/leics/dataset/created/single_before/364_24.obj'))
-        print(len(mesh.faces))
-    except:
-        print('error')
-        continue
+with open('train.txt','w') as f:
+    for index in indexes:
+        f.write(str(index)+'\n')
+# with open('wrong.txt') as f:
+#     lines = f.readlines()
+# for line in lines:
+#     try:
+#         mesh = trimesh.load_mesh(Path(f'/data3/leics/dataset/created/single_before/364_24.obj'))
+#         print(len(mesh.faces))
+#     except:
+#         print('error')
+#         continue
 
 # meshes = []
 # for i in range(32):

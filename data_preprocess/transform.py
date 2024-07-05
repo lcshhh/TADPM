@@ -47,7 +47,7 @@ def paste(index,dataroot,outputroot,num):
     vedo.write(after_mesh_upper,os.path.join(outputroot,f'{num}_after_upper.vtp'))
     print(num)
 
-def get_mesh(dataroot,outputroot_before,outputroot_after,paramroot,index,num):
+def  get_mesh(dataroot,outputroot_before,outputroot_after,paramroot,index,num):
     seed_torch(num)
     dofs = torch.cat([torch.normal(mean=0.,std=0.02,size=(32,3)),torch.normal(mean=0.,std=0.05,size=(32,3))],dim=1)
     trans = se3_exp_map(dofs).transpose(1,2)

@@ -1,7 +1,9 @@
 python test.py \
-	--checkpoint "/data3/leics/checkpoints/mesh/diffusion_add/best_acc.pkl" \
+	--checkpoint "/data3/leics/checkpoints/mesh/diffusion_aug/best_acc.pkl" \
 	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
 	--paramroot "/data/lcs/finetuned_teeth/transformed_after_param" \
+	--before_path "/data3/leics/dataset/created/single_pointcloud_before513" \
+	--after_path "/data3/leics/dataset/created/single_pointcloud_after513" \
 	--batch_size 16 --n_classes 40 \
 	--n_epoch 700 \
 	--name "temp" \

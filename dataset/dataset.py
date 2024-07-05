@@ -165,17 +165,20 @@ class teethDataset(data.Dataset):
 #         return dataset
 
 class FullTeethDataset(data.Dataset):
-    def __init__(self, dataroot, paramroot, file_name, train=True):
+    def __init__(self, dataroot, paramroot, file_name, train, args, npoint):
         super().__init__()
         self.feats = ['area', 'face_angles', 'curvs', 'normal']
         self.dataroot = dataroot
         self.paramroot = paramroot
+        self.before_path = args.before_path
+        self.after_path = args.after_path
+        self.npoint = npoint
         with open(file_name) as f:
             self.indexes = [int(i.strip()) for i in f.readlines()]
         self.train = train
     
     def __getitem__(self, idx):
-        point_num = 2048
+        point_num = self.npoint
         feats = np.zeros((32,10,256,64))
         center = np.zeros((32,256,64,3))
         cordinates = np.zeros((32,256,64,9))
@@ -187,11 +190,11 @@ class FullTeethDataset(data.Dataset):
         after_centroid = np.zeros((32,3))
         index = self.indexes[idx]
         masks = np.zeros((32),dtype=np.int32)
-        dofs = torch.load(os.path.join('/data3/leics/dataset/mesh/param',f'{index}.pkl'))
+        dofs = torch.load(os.path.join(self.paramroot,f'{index}.pkl'))
         for i in range(32):
             obj_path = os.path.join(self.dataroot,f'{index}_{i}.obj')
-            before_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_before2049',f'{index}_{i}.ply')
-            after_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_after2049',f'{index}_{i}.ply')
+            before_path = os.path.join(self.before_path,f'{index}_{i}.ply')
+            after_path = os.path.join(self.after_path,f'{index}_{i}.ply')
             # before_vertices_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_before2049',f'{index}_{i}.ply')
             # after_vertices_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_after2049',f'{index}_{i}.ply')
             if os.path.exists(obj_path) and os.path.exists(before_path) and os.path.exists(after_path):

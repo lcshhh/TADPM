@@ -99,9 +99,9 @@ def rearrange_index(index):
 #           mesh.export(os.path.join(out_after_path,f'{num}_{fdi}.obj'))
 #     num += 1
 # print(num)
-with open('train.txt','w') as f:
-    for i in range(959):
-         f.write(str(i)+'\n')
+# with open('train.txt','w') as f:
+#     for i in range(959):
+#          f.write(str(i)+'\n')
 with open('val.txt','w') as f:
     for i in range(959,1082):
          f.write(str(i)+'\n')

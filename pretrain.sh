@@ -1,5 +1,5 @@
 python pretrain.py train \
-	--dataroot "/data3/leics/dataset/created/single_before" \
+	--dataroot "/data3/leics/dataset/created/remesh_before" \
 	--checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
 	--batch_size 64 \
 	--augment_scale --augment_orient --n_epoch 700 \

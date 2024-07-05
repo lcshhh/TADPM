@@ -71,16 +71,18 @@ def read_pointcloud():
     xyz = np.asarray(pcd.points)
     return xyz
 
-before_dataroot = Path('/data3/leics/dataset/mesh/single_before')
-after_dataroot = Path('/data3/leics/dataset/mesh/single_after')
-before_outputroot = '/data3/leics/dataset/mesh/single_pointcloud_before2049'   #
-after_outputroot = '/data3/leics/dataset/mesh/single_pointcloud_after2049'   #
+before_dataroot = Path('/data3/leics/dataset/created/single_before')
+after_dataroot = Path('/data3/leics/dataset/created/single_after')
+before_outputroot = '/data3/leics/dataset/created/single_pointcloud_before2049'   #
+after_outputroot = '/data3/leics/dataset/created/single_pointcloud_after2049'   #
 # with open('valid.txt') as f:
 #      indexes = [int(i.strip()) for i in f.readlines()]
 os.makedirs(before_outputroot,exist_ok=True)
 os.makedirs(after_outputroot,exist_ok=True)
 pool = Pool(processes=32)
 for obj in before_dataroot.iterdir():
+     if not os.path.exists(os.path.join(after_dataroot,obj.name)):
+          continue
      pool.apply_async(
           get_pointcloud_with_center,
           (before_outputroot,after_outputroot,after_dataroot,obj)
