@@ -189,14 +189,13 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         else:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
         # loss1 = chamfer_loss(before_points,after_points,outputs/10, masks)
-        loss1 = chamfer_loss2(index,outputs/10)
+        # loss1 = chamfer_loss2(index,outputs/10)
+        loss1 = add_loss(before_points,after_points,outputs/10,masks)
         criterion = nn.MSELoss(reduction='none')
         loss2 = criterion(dofs,outputs/10).sum(dim=-1)
-        loss2 = 30*(loss2 * masks).sum()
+        loss2 = 5*(loss2 * masks).sum()
         # loss2 = centroid_loss(centroid, after_centroid, outputs)
         # loss = chamfer_loss(before_points,after_points,outputs).mean()
-        print('loss1:',loss1)
-        print('loss2:',loss2)
         loss = loss2 + loss1
         # print('centroid loss:',loss2)
         # loss = loss2
@@ -248,7 +247,8 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
             else:
                 outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
             # loss = 512*chamfer_loss(before_points,after_points,centroid, outputs, masks)
-            loss = chamfer_loss(before_points,after_points,outputs/10, masks)
+            # loss = chamfer_loss(before_points,after_points,outputs/10, masks)
+            loss = add_loss(before_points,after_points,outputs/10,masks)
             running_loss += loss.item() * faces.size(0)
             progress_bar(it, len(test_dataset), 'Test Loss: %.3f'% (running_loss/n_samples))
 
@@ -349,7 +349,7 @@ if __name__ == '__main__':
     os.makedirs(checkpoint_path, exist_ok=True)
 
     train.step = 0
-    test.best_loss = 1000
+    test.best_loss = 99999
 
     # ========== Start Training ==========
     for epoch in range(args.n_epoch):
@@ -358,3 +358,4 @@ if __name__ == '__main__':
         print('train finished')
         test(net, args.name, optimizer, scheduler, test_data_loader, epoch, args)
         print('test finished')
+        

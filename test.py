@@ -213,10 +213,10 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = TADPM(args).to(device)
     net = nn.DataParallel(net)
-    if args.checkpoint != '':
-        checkpoint = torch.load(args.checkpoint)
-        print('loading model...')
-        net.load_state_dict(checkpoint['model'],strict=True)
+    # if args.checkpoint != '':
+    #     checkpoint = torch.load(args.checkpoint)
+    #     print('loading model...')
+    #     net.load_state_dict(checkpoint['model'],strict=True)
     print("Let's use", torch.cuda.device_count(), "GPUs!")
     # if args.mode != 'train':
     

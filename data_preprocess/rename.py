@@ -51,23 +51,23 @@ def rearrange_index(index):
     a = rearrange(np.array([index]))
     return a[0] - 1
 
-train_path = Path('/data/lcs/dataset/mesh/scan_train')
-val_path = Path('/data/lcs/dataset/mesh/scan_eval')
-test_path = Path('/data/lcs/dataset/mesh/scan_test')
-out_before_path = Path('/data3/leics/dataset/mesh/single_before')
-out_after_path = Path('/data3/leics/dataset/mesh/single_after')
-os.makedirs(out_before_path,exist_ok=True)
-os.makedirs(out_after_path,exist_ok=True)
-train_list = []
-val_list = []
-test_list = []
-num = 1082
-with open('train.txt') as f:
-     train_list = [int(i.strip()) for i in f.readlines()]
-with open('val.txt') as f:
-     val_list = [int(i.strip()) for i in f.readlines()]
-with open('test.txt') as f:
-     test_list = [int(i.strip()) for i in f.readlines()]
+# train_path = Path('/data/lcs/dataset/mesh/scan_train')
+# val_path = Path('/data/lcs/dataset/mesh/scan_eval')
+# test_path = Path('/data/lcs/dataset/mesh/scan_test')
+# out_before_path = Path('/data3/leics/dataset/mesh/single_before')
+# out_after_path = Path('/data3/leics/dataset/mesh/single_after')
+# os.makedirs(out_before_path,exist_ok=True)
+# os.makedirs(out_after_path,exist_ok=True)
+# train_list = []
+# val_list = []
+# test_list = []
+# num = 1082
+# with open('train.txt') as f:
+#      train_list = [int(i.strip()) for i in f.readlines()]
+# with open('val.txt') as f:
+#      val_list = [int(i.strip()) for i in f.readlines()]
+# with open('test.txt') as f:
+#      test_list = [int(i.strip()) for i in f.readlines()]
 # for i,index in enumerate(train_list):
 #     before_path = Path(os.path.join(train_path,f'{index}_all32_start'))
 #     after_path = Path(os.path.join(train_path,f'{index}_all32_end'))

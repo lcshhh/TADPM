@@ -1,5 +1,5 @@
 python test.py \
-	--checkpoint "/data3/leics/checkpoints/mesh/diffusion4e-4/best_acc.pkl" \
+	--checkpoint "/data3/leics/checkpoints/mesh/diffusion_add/best_acc.pkl" \
 	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
 	--paramroot "/data/lcs/finetuned_teeth/transformed_after_param" \
 	--batch_size 16 --n_classes 40 \

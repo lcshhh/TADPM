@@ -1,14 +1,14 @@
 python train.py train \
 	--encoder_checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
-	--dataroot "/data3/leics/dataset/created/remesh_before" \
-	--paramroot "/data3/leics/dataset/created/params" \
+	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
+	--paramroot "/data3/leics/dataset/mesh/param" \
 	--batch_size 32 --n_classes 40 \
 	--n_epoch 700 \
-	--name "diffusion4e-4" \
+	--name "diffusion_add2" \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \
-	--lr 4e-4 \
+	--lr 1e-4 \
 	--weight 0.5 \
 	--depth 12 \
 	--heads 12 \

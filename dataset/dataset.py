@@ -175,7 +175,7 @@ class FullTeethDataset(data.Dataset):
         self.train = train
     
     def __getitem__(self, idx):
-        point_num = 512
+        point_num = 2048
         feats = np.zeros((32,10,256,64))
         center = np.zeros((32,256,64,3))
         cordinates = np.zeros((32,256,64,9))
@@ -190,18 +190,24 @@ class FullTeethDataset(data.Dataset):
         dofs = torch.load(os.path.join('/data3/leics/dataset/mesh/param',f'{index}.pkl'))
         for i in range(32):
             obj_path = os.path.join(self.dataroot,f'{index}_{i}.obj')
-            before_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_before513',f'{index}_{i}.ply')
-            after_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_after513',f'{index}_{i}.ply')
+            before_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_before2049',f'{index}_{i}.ply')
+            after_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_after2049',f'{index}_{i}.ply')
+            # before_vertices_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_before2049',f'{index}_{i}.ply')
+            # after_vertices_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_after2049',f'{index}_{i}.ply')
             if os.path.exists(obj_path) and os.path.exists(before_path) and os.path.exists(after_path):
+                try:
+                    feats[i], center[i], cordinates[i], faces[i], Fs[i]= load_mesh_shape(obj_path, 
+                                                                    request=self.feats)
+                except:
+                    print(obj_path)
+                    continue
                 masks[i] = 1
-                feats[i], center[i], cordinates[i], faces[i], Fs[i]= load_mesh_shape(obj_path, 
-                                                                request=self.feats)
                 before = read_pointcloud(before_path)
-                before_points[i] = before[:512]
-                centroid[i] = before[512]
+                before_points[i] = before[:point_num]
+                centroid[i] = before[point_num]
                 after = read_pointcloud(after_path)
-                after_points[i] = after[:512]
-                after_centroid[i] = after[512]
+                after_points[i] = after[:point_num]
+                after_centroid[i] = after[point_num]
         return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,dofs,masks
         # return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,before_points_centered
 

@@ -56,9 +56,9 @@ class TADPM(nn.Module):
         self.bn1 = nn.BatchNorm1d(800)
         self.bn2 = nn.BatchNorm1d(1827)
         self.blocks = nn.ModuleList([
-            Block(embed_dim+32, 8, qkv_bias=True, drop_path=0.1)
+            Block(embed_dim+32, 8, qkv_bias=True)
             for i in range(12)])
-        # self.initialze_weights()
+        self.initialze_weights()
         if args.encoder_checkpoint != '':
             checkpoint = torch.load(args.encoder_checkpoint)['model']
             new_state_dict = OrderedDict()
@@ -67,18 +67,18 @@ class TADPM(nn.Module):
                 new_state_dict[name] = v
             self.encoder.load_state_dict(new_state_dict, strict=False)
     
-    # def initialze_weights(self):
-    #     for layer in self.modules():
-    #         if isinstance(layer, nn.Linear):
-    #             # 使用 Xavier 初始化
-    #             nn.init.xavier_uniform_(layer.weight)
-    #             # nn.init.zeros_(layer.bias)
-    #         if isinstance(layer, nn.Conv2d):
-    #             # 使用 Xavier 初始化
-    #             nn.init.xavier_uniform_(layer.weight)
-    #         if isinstance(layer, nn.Conv1d):
-    #             # 使用 Xavier 初始化
-    #             nn.init.xavier_uniform_(layer.weight)
+    def initialze_weights(self):
+        for layer in self.modules():
+            if isinstance(layer, nn.Linear):
+                # 使用 Xavier 初始化
+                nn.init.xavier_uniform_(layer.weight)
+                # nn.init.zeros_(layer.bias)
+            if isinstance(layer, nn.Conv2d):
+                # 使用 Xavier 初始化
+                nn.init.xavier_uniform_(layer.weight)
+            if isinstance(layer, nn.Conv1d):
+                # 使用 Xavier 初始化
+                nn.init.xavier_uniform_(layer.weight)
         
     def forward(self,faces, feats, centers, Fs, cordinates, centroid, points, gt_6dof=None):
         '''

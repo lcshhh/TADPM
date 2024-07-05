@@ -47,6 +47,16 @@ def transform_mesh(mesh,dof):
     mesh.vertices = predicted_vertices
     return mesh
 
+def transform_vertices(vertices,dof):
+    '''
+    centroid [bs,16,3]
+    '''
+    bs = dof.shape[0]
+    trans_matrix = se3_exp_map(dof.unsqueeze(0)).transpose(2,1) # [16,4,4]
+    vertices = torch.from_numpy(vertices).to(dof.device).float()
+    predicted_vertices = Transform3d(matrix=trans_matrix.transpose(2,1)[0]).transform_points(vertices)
+    return predicted_vertices
+
 def merge_mesh(index):
     meshes = []
     for i in range(32):
@@ -57,11 +67,39 @@ def merge_mesh(index):
     mesh = vedo.merge(meshes)
     vedo.write(mesh,f'/data/lcs/dataset/{index}.obj')
 
-paramroot = '/data3/leics/dataset/created/params'
-
 def cal_add(mesh1,mesh2):
     add = torch.square(torch.FloatTensor(mesh1.vertices - mesh2.vertices)).sum()
     return add
+
+# paramroot = '/data3/leics/dataset/created/params'
+
+# dof = torch.load(os.path.join(paramroot,f'0.pkl')).float()
+# meshes = []
+# before_meshes = []
+# gt_meshes = []
+# for i in range(32):
+#     path = f'/data3/leics/dataset/created/single_before/0_{i}.obj'
+#     if not os.path.exists(path):
+#         continue
+#     mesh = trimesh.load_mesh(f'/data3/leics/dataset/created/single_before/0_{i}.obj')
+#     gt_mesh = trimesh.load_mesh(f'/data3/leics/dataset/created/single_after/0_{i}.obj')
+#     before_mesh = trimesh.load_mesh(path)
+#     predicted_mesh = transform_mesh(mesh,dof[i])
+#     add = cal_add(predicted_mesh,before_mesh)
+#     print(add)
+#     meshes.append(vedo.trimesh2vedo(predicted_mesh))
+#     before_meshes.append(vedo.trimesh2vedo(before_mesh))
+#     gt_meshes.append(vedo.trimesh2vedo(gt_mesh))
+    
+# mesh = vedo.merge(meshes)
+# before_mesh = vedo.merge(before_meshes)
+# gt_mesh = vedo.merge(gt_meshes)
+# vedo.write(mesh,'/data3/leics/dataset/created/after.obj')
+# vedo.write(before_mesh,'/data3/leics/dataset/created/before.obj')
+# vedo.write(gt_mesh,'/data3/leics/dataset/created/gt.obj')
+# merge_mesh(177)
+
+paramroot = '/data3/leics/dataset/created/params'
 
 dof = torch.load(os.path.join(paramroot,f'0.pkl')).float()
 meshes = []
@@ -81,10 +119,3 @@ for i in range(32):
     before_meshes.append(vedo.trimesh2vedo(before_mesh))
     gt_meshes.append(vedo.trimesh2vedo(gt_mesh))
     
-mesh = vedo.merge(meshes)
-before_mesh = vedo.merge(before_meshes)
-gt_mesh = vedo.merge(gt_meshes)
-vedo.write(mesh,'/data3/leics/dataset/created/after.obj')
-vedo.write(before_mesh,'/data3/leics/dataset/created/before.obj')
-vedo.write(gt_mesh,'/data3/leics/dataset/created/gt.obj')
-# merge_mesh(177)
