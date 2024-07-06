@@ -1,10 +1,10 @@
 python pretrain.py train \
-	--dataroot "/data3/leics/dataset/created/remesh_before" \
+	--dataroot "/data3/leics/dataset/mesh/remesh_after_centered" \
 	--checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
-	--batch_size 64 \
+	--batch_size 512 \
 	--augment_scale --augment_orient --n_epoch 700 \
 	--num_warmup_steps 2 \
-	--name "single_no_center_augmented" \
+	--name "tmp" \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \

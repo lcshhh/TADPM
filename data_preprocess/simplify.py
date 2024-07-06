@@ -39,13 +39,9 @@ def simplify(obj_path,output_root_simplify,output_root_manifold):
             raise Exception('wrong, command=%s, status=%s' % (commands, status))
 
 def quad_simplify(obj_path,output_root_simplify,output_root_manifold):
-    # if os.path.exists(os.path.join(output_root_simplify,obj_path.name)):
-    #     return
-    # mesh = vedo.Mesh(os.path.join(output_root_manifold,obj_path.name))
-    try:
-        mesh = trimesh.load_mesh(os.path.join(output_root_manifold,obj_path.name))
-    except:
-        print(os.path.join(output_root_manifold,obj_path.name))
+    if os.path.exists(os.path.join(output_root_simplify,obj_path.name)):
+        return
+    mesh = vedo.Mesh(os.path.join(output_root_manifold,obj_path.name))
     mesh = vedo.vedo2trimesh(mesh)
     # mesh = trimesh.load_mesh(os.path.join(output_root_manifold,obj_path.name))
     mesh_simplifier = pyfqmr.Simplify()
@@ -57,10 +53,10 @@ def quad_simplify(obj_path,output_root_simplify,output_root_manifold):
     mesh.export(os.path.join(output_root_simplify,obj_path.name))
 
 if __name__ == '__main__':
-    root = '/data3/leics/dataset/created/single_before'
+    root = '/data3/leics/dataset/mesh/single_after_centered'
     dataroot = Path(root)
-    output_root_manifold = '/data3/leics/dataset/created/manifold_before'
-    output_root_simplify = '/data3/leics/dataset/created/simplify_before'
+    output_root_manifold = '/data3/leics/dataset/mesh/single_after_centered'
+    output_root_simplify = '/data3/leics/dataset/mesh/simplify_after_centered'
     if not os.path.exists(output_root_manifold):
         os.mkdir(output_root_manifold)
     if not os.path.exists(output_root_simplify):

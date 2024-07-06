@@ -188,12 +188,12 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
         else:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
-        loss1 = chamfer_loss(before_points,after_points,outputs/10, masks)
+        # loss1 = chamfer_loss(before_points,after_points,outputs/10, masks)
         # loss1 = chamfer_loss2(index,outputs/10)
-        # loss1 = add_loss(before_points,after_points,outputs/10,masks)
+        loss1 = add_loss(before_points,after_points,outputs/10,masks)
         criterion = nn.MSELoss(reduction='none')
         loss2 = criterion(dofs,outputs/10).sum(dim=-1)
-        loss2 = 5*(loss2 * masks).sum()
+        loss2 = 3*(loss2 * masks).sum()
         # loss2 = centroid_loss(centroid, after_centroid, outputs)
         # loss = chamfer_loss(before_points,after_points,outputs).mean()
         loss = loss2 + loss1
@@ -315,7 +315,7 @@ if __name__ == '__main__':
     # dataManager = FullTeethDataManager(dataroot,paramroot,args.train_ratio,)
     # train_dataset = dataManager.train_dataset()
     # test_dataset = dataManager.test_dataset()
-    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,512)
+    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,2048)
     args.before_path = '/data3/leics/dataset/mesh/single_pointcloud_before2049'
     args.after_path = '/data3/leics/dataset/mesh/single_pointcloud_after2049'
     test_dataset = FullTeethDataset('/data3/leics/dataset/mesh/remesh_before','/data3/leics/dataset/mesh/param','val.txt',False,args,2048)

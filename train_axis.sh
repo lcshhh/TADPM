@@ -1,0 +1,24 @@
+python train_axis.py train \
+	--encoder_checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
+    --checkpoint "/data3/leics/checkpoints/mesh/aug_axis/best_acc.pkl" \
+	--dataroot "/data3/leics/dataset/mesh/remesh_after_centered" \
+	--batch_size 512 --n_classes 40 \
+	--n_epoch 700 \
+	--name "aug_axis" \
+	--weight_decay 0.05 \
+	--mask_ratio 0.5 \
+	--channels 10 --patch_size 64 \
+	--lr 1e-4 \
+	--weight 0.5 \
+	--depth 12 \
+	--heads 12 \
+	--lr_milestones "none" --optim "adamw" \
+	--encoder_depth 12 \
+	--decoder_depth 6 \
+	--decoder_dim 512 \
+	--decoder_num_heads 16 \
+	--num_warmup_steps "2" \
+	--dim 768 \
+	--use_pointnet \
+	--lower \
+	--saveroot "/data3/leics/checkpoints/axis" \

@@ -15,6 +15,7 @@ import torch.backends.cudnn as cudnn
 from collections import OrderedDict
 from transformers import AdamW, get_linear_schedule_with_warmup, get_constant_schedule, get_cosine_schedule_with_warmup
 import time
+from util import progress_bar
 
 
 def  train(net, optim, scheduler, names, train_dataset, epoch, args):
@@ -36,6 +37,8 @@ def  train(net, optim, scheduler, names, train_dataset, epoch, args):
         loss.backward()
         optim.step()
         running_loss += loss.item() * faces.size(0)
+        epoch_loss = running_loss / n_samples
+        progress_bar(it,len(train_dataset),'epoch ({:}): {:} Train Loss: {:.4f}'.format(names, epoch, epoch_loss))
 
     epoch_loss = running_loss / n_samples
 
@@ -64,6 +67,8 @@ def test(net, optim, scheduler, names, test_dataset, epoch, args):
         n_samples += faces.shape[0]
         loss = net(faces, feats, centers, Fs, cordinates).mean()
         running_loss += loss.item() * faces.size(0)
+        epoch_loss = running_loss / n_samples
+        progress_bar(it,len(test_dataset),'epoch ({:}): {:} Test Loss: {:.4f}'.format(names, epoch, epoch_loss))
 
     epoch_loss = running_loss / n_samples
 
@@ -185,8 +190,8 @@ if __name__ == '__main__':
     if args.mode == 'train':
         for epoch in range(args.n_epoch):
             print('epoch', epoch)
-            # train(net, optim, scheduler, args.name, train_data_loader, epoch, args)
+            train(net, optim, scheduler, args.name, train_data_loader, epoch, args)
             print('train finished')
-            test(net, optim, scheduler, args.name, train_data_loader, epoch, args)
+            test(net, optim, scheduler, args.name, test_data_loader, epoch, args)
             print('test finished')
 

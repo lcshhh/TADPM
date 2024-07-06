@@ -1,17 +1,14 @@
-python train.py train \
+python test_axis.py train \
 	--encoder_checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
-	--checkpoint "/data3/leics/checkpoints/mesh/diffusion_aug/best_acc.pkl" \
-	--dataroot "/data3/leics/dataset/created/remesh_before" \
-	--before_path "/data3/leics/dataset/created/single_pointcloud_before2049" \
-	--after_path "/data3/leics/dataset/created/single_pointcloud_after2049" \
-	--paramroot "/data3/leics/dataset/created/params" \
-	--batch_size 32 --n_classes 40 \
+    --checkpoint "/data3/leics/checkpoints/mesh/aug_axis/best_acc.pkl" \
+	--dataroot "/data3/leics/dataset/mesh/remesh_after_centered" \
+	--batch_size 256 --n_classes 40 \
 	--n_epoch 700 \
-	--name "diffusion_aug" \
+	--name "aug_axis" \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \
-	--lr 1e-3 \
+	--lr 1e-4 \
 	--weight 0.5 \
 	--depth 12 \
 	--heads 12 \

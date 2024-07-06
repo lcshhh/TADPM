@@ -11,6 +11,9 @@ from pytorch3d.transforms import *
 import random
 import scipy
 import trimesh
+import copy
+from scipy.spatial.transform import Rotation
+
 def seed_torch(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -47,65 +50,38 @@ def paste(index,dataroot,outputroot,num):
     vedo.write(after_mesh_upper,os.path.join(outputroot,f'{num}_after_upper.vtp'))
     print(num)
 
-def get_mesh(dataroot,outputroot_before,outputroot_after,paramroot,index,num):
+def randomize_mesh_orientation(mesh: trimesh.Trimesh):
+    mesh1 = copy.deepcopy(mesh)
+    axis_seq = ''.join(random.sample('xyz', 3))
+    angles = [random.uniform(-20,20) for _ in range(3)]
+    rotation = Rotation.from_euler(axis_seq, angles, degrees=True)
+    mesh1.vertices = rotation.apply(mesh1.vertices)
+    return mesh1, rotation
+
+def get_mesh(obj_path,outputroot,axis_outputroot,num):
     seed_torch(num)
-    dofs = torch.cat([torch.normal(mean=0.,std=0.02,size=(32,3)),torch.normal(mean=0.,std=0.05,size=(32,3))],dim=1)
-    trans = se3_exp_map(dofs).transpose(1,2)
-    ran = range(32)
-    for i in ran:
-        path = os.path.join(dataroot,f'{index}_{i}.obj')
-        if os.path.exists(path):
-            mesh = trimesh.load_mesh(path)
-            mesh.export(os.path.join(outputroot_after,f'{num}_{i}.obj'))
-            mesh.apply_transform(trans[i])
-            mesh.export(os.path.join(outputroot_before,f'{num}_{i}.obj'))
-    trans_matrix = torch.inverse(trans)
-    torch.save(trans_matrix,os.path.join(paramroot,f'matrix_{num}.pkl'))
-    dofs_gt = se3_log_map(trans_matrix.transpose(1,2))
-    torch.save(dofs_gt,os.path.join(paramroot,f'6dof_{num}.pkl'))
+    mesh = trimesh.load_mesh(obj_path)
+    index = int(obj_path.name.split('_')[0])
+    fdi = int(obj_path.name.split('_')[1].split('.')[0])
+    rotated_mesh, rotation = randomize_mesh_orientation(mesh)
+    rotated_mesh.export(os.path.join(outputroot,f'{num}.obj'))
+    axis = np.load(f'/data3/leics/dataset/mesh/single_after_axis_revert/{index}.npy')[fdi]
+    axis = np.reshape(axis,(3,3))
+    after_axis = rotation.apply(axis)
+    np.save(os.path.join(axis_outputroot,f'{num}.npy'),after_axis)
+
     
 
-# dataroot = Path('/data/lcs/first_upper/upper_centered_normed')
-# outputroot = Path('/data/lcs/first_upper/transformed_centered_normed')
-# os.makedirs(outputroot,exist_ok=True)
-# # for obj in dataroot.iterdir():
-# n_variance = 10
-# for _ in range(n_variance):
-#     pool = Pool(processes=64)
-#     num = len(glob(os.path.join(outputroot,f'*.vtp')))//2
-#     for i,index in enumerate(useful_lst):
-#         obj = os.path.join(dataroot,f'{index}_before_upper.vtp')
-#         origin_path = os.path.join(dataroot,f'{index}_after_upper.vtp')
-#         pool.apply_async(
-#             transform_mesh,
-#             (obj,origin_path,outputroot,num+i)
-#         )
-#     pool.close()
-#     pool.join()
-# pool = Pool(processes=64)
-# num = len(glob(os.path.join(outputroot,f'*.vtp')))//4
-# for i,index in enumerate(useful_lst):
-#         pool.apply_async(
-#             paste,
-#             (index,dataroot,outputroot,num+i)
-#         )
-# pool.close()
-# pool.join()
-dataroot = Path('/data/lcs/dataset/teeth_full/single_normed_after')
-outputroot_before = Path('/data/lcs/dataset/created/single_normed_before')
-os.makedirs(outputroot_before,exist_ok=True)
-outputroot_after = Path('/data/lcs/dataset/created/single_normed_after')
-os.makedirs(outputroot_after,exist_ok=True)
-paramroot = Path('/data/lcs/dataset/created/params')
-os.makedirs(paramroot,exist_ok=True)
-with open('train.txt') as f:
-     indexes = [int(i.strip()) for i in f.readlines()]
+dataroot = Path('/data3/leics/dataset/mesh/remesh_after_centered')
+outputroot = Path('/data3/leics/dataset/mesh/remesh_after_centered_aug')
+axis_outputroot = Path('/data3/leics/dataset/mesh/axis_aug')
+os.makedirs(outputroot,exist_ok=True)
 pool = Pool(processes=64)
-n_variance = 5
+n_variance = 3
 for i in range(n_variance):
 # if True:
     # num = len(glob(os.path.join(outputroot,f'*.vtp')))//2
-    for j,index in enumerate(indexes):
+    for j,index in enumerate(dataroot.iterdir()):
             # obj = os.path.join(dataroot,f'{i}_after_lower.vtp')
             num = i * 821 + j
             pool.apply_async(

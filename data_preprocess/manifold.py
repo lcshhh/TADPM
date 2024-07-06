@@ -13,12 +13,12 @@ import pyfqmr
 import csv
 
 def manifold(obj_path,dataroot,output_root_manifold):
+    if os.path.exists(output_root_manifold + '/' + obj_path.name):
+        return
     mesh = vedo.Mesh(str(obj_path))
     oface_number = len(mesh.faces())
     mface_number = oface_number * 1.2
     # mface_number = 20000
-    if os.path.exists(output_root_manifold + '/' + obj_path.name):
-        return
     commandm = '../Manifold/build/manifold ' + str(
         obj_path) + ' ' + output_root_manifold + '/' + obj_path.name + ' ' + str(int(mface_number))
     try:
@@ -49,10 +49,10 @@ def quad_simplify(obj_path,output_root_simplify,output_root_manifold):
     mesh.export(os.path.join(output_root_simplify,obj_path.name))
 
 if __name__ == '__main__':
-    root = '/data3/leics/dataset/created/single_before'
+    root = '/data3/leics/dataset/mesh/single_after_centered'
     dataroot = Path(root)
-    output_root_manifold = '/data3/leics/dataset/created/manifold_before'
-    output_root_simplify = '/data3/leics/dataset/created/simplify_before'
+    output_root_manifold = '/data3/leics/dataset/mesh/manifold_after_centered'
+    output_root_simplify = '/data3/leics/dataset/mesh/simplify_after_centered'
     if not os.path.exists(output_root_manifold):
         os.mkdir(output_root_manifold)
     if not os.path.exists(output_root_simplify):
