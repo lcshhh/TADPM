@@ -11,6 +11,8 @@ import vedo
 from scipy.spatial.transform import Rotation
 from pytorch3d.transforms import *
 def register(after_dataroot,before_dataroot,trans_root,index):
+    if os.path.exists(os.path.join(before_dataroot,f'{index}.npy')):
+        return
     after_axis = np.load(os.path.join(after_dataroot,f'{index}.npy'))   
     dofs = torch.load(os.path.join(trans_root,f'{index}.pkl'))
     trans_matrix = se3_exp_map(dofs).transpose(2,1) # [32,4,4]

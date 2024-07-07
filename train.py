@@ -88,12 +88,12 @@ def rotation_matrix(vec1, vec2):
     c = torch.sum(a*b,dim=-1)
     s = torch.norm(n_vector,dim=-1)
     # s.masked_fill_(masks.flatten(),1)
-    n_matrix = torch.zeros(bs,3,3).to(device)
+    n_matrix = torch.zeros(bs,3,3).cuda()
     for i in range(bs):
         n_matrix[i] = torch.tensor([[0, -n_vector[i,2], n_vector[i,1]],
                              [n_vector[i,2], 0, -n_vector[i,0]],
                              [-n_vector[i,1], n_vector[i,0], 0]], dtype=torch.float32)
-    I = torch.stack([torch.eye(3) for _ in range(bs)],dim=0).to(device)
+    I = torch.stack([torch.eye(3) for _ in range(bs)],dim=0).cuda()
     rotation_matrix = I + n_matrix + ((torch.bmm(n_matrix,n_matrix) * ((1 - c.view(-1,1,1)) / (s.view(-1,1,1) ** 2))))
     return rotation_matrix
 
@@ -105,12 +105,12 @@ def rotation_matrix_with_axis(theta, v):
     :return: 旋转矩阵
     """
     bs = theta.shape[0]
-    K = torch.zeros(bs,3,3).to(device)
+    K = torch.zeros(bs,3,3).cuda()
     for i in range(bs):
         K[i] = torch.tensor([[0, -v[i,2], v[i,1]],
                         [v[i,2], 0, -v[i,0]],
-                        [-v[i,1], v[i,0], 0]]).to(device)
-    I = torch.stack([torch.eye(3) for _ in range(bs)],dim=0).to(device)
+                        [-v[i,1], v[i,0], 0]]).cuda()
+    I = torch.stack([torch.eye(3) for _ in range(bs)],dim=0).cuda()
     R = I + torch.sin(theta).view(-1,1,1) * K + (1 - torch.cos(theta).view(-1,1,1)) * torch.bmm(K, K)
     return R
 
@@ -120,7 +120,7 @@ def align_axis(normal1,normal2,gt_normal1,gt_normal2):
     after_axis = torch.bmm(gt_normal2.view(-1,3).unsqueeze(1),rot_matrix)
     rho = torch.cross(after_axis.squeeze(1), normal2.view(-1,3),dim=-1)
     eps = 1e-7
-    theta = torch.acos(torch.clamp(torch.sum(normal2.view(-1,3)*after_axis.squeeze(1),dim=-1),min=-1+eps,max=1-eps)).to(device)
+    theta = torch.acos(torch.clamp(torch.sum(normal2.view(-1,3)*after_axis.squeeze(1),dim=-1),min=-1+eps,max=1-eps)).cuda()
     theta = -torch.sign(torch.sum(normal1.view(-1,3)*rho,dim=-1)) * theta
     R = rotation_matrix_with_axis(theta,normal1.view(-1,3))
     RR = torch.bmm(rot_matrix,R)
@@ -254,7 +254,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, axis,masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, after_axis,before_axis,masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
@@ -266,7 +266,8 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         centroid = centroid.to(torch.float32).cuda()
         after_centroid = after_centroid.to(torch.float32).cuda()
         # masks = (masks>0).cuda()
-        axis = axis.to(torch.float32).cuda()
+        after_axis = after_axis.to(torch.float32).cuda()
+        axis = after_axis[:,:,:8]
         masks = masks.cuda()
         # trans_matrix = trans_matrix.to(torch.float32).cuda()
         n_samples += faces.shape[0]

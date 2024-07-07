@@ -25,7 +25,8 @@ def registration(index,save_path):
     vedo.write(mesh_2,os.path.join(save_path,f'{index}_before.vtp'))
 
 def register(index,dataroot1,dataroot2,outputroot):
-     dofs = torch.zeros(32,6)
+     # dofs = torch.zeros(32,6)
+     rot_matrix = torch.eye(32,3,3)
      for i in range(32):
         obj_path1 = os.path.join(dataroot1,f'{index}_{i}.obj')
         obj_path2 = os.path.join(dataroot2,f'{index}_{i}.obj')
@@ -34,17 +35,23 @@ def register(index,dataroot1,dataroot2,outputroot):
             mesh2 = trimesh.load_mesh(obj_path2)
             points = mesh1.sample(2048)
             matrix = trimesh.registration.icp(points,mesh2,scale=False,max_iterations=20)[0]
-            dofs[i] = se3_log_map(torch.from_numpy(matrix).transpose(0,1).unsqueeze(0))
-     torch.save(dofs,os.path.join(outputroot,f'{index}.pkl'))
+          #   dofs[i] = se3_log_map(torch.from_numpy(matrix).transpose(0,1).unsqueeze(0))
+          #   matrix = matrix[:6]
+            rot_matrix[i] = torch.from_numpy(matrix[:3,:3])
+     # torch.save(dofs,os.path.join(outputroot,f'{index}.pkl'))
+     torch.save(rot_matrix,os.path.join(outputroot,f'{index}.pkl'))
 
 
 
-dataroot1 = '/data3/leics/dataset/mesh/single_before'
-dataroot2 = '/data3/leics/dataset/mesh/single_after'
+dataroot1 = '/data3/leics/dataset/rot_matrix/single_before_centered'
+dataroot2 = '/data3/leics/dataset/rot_matrix/single_after_centered'
 with open('val.txt','r') as f:
      indexes = [int(i.strip()) for i in f.readlines()]
-outputroot = '/data3/leics/dataset/mesh/param'
+outputroot = '/data3/leics/dataset/rot_matrix/param'
 os.makedirs(outputroot,exist_ok=True)
+with open('train.txt','r') as f:
+     for i in f.readlines():
+         indexes.append(int(i.strip()))
 # with open('check.txt','r',encoding='utf-8') as file:
 #      lines = file.readlines()
 # indexes = [int(i) for i in lines]     
@@ -54,7 +61,7 @@ for index in indexes:
           register,
           (index,dataroot1,dataroot2,outputroot)
      )
-    # register(index,dataroot1,dataroot2,outputroot)
+#     register(index,dataroot1,dataroot2,outputroot)
     #  register(obj_path1,obj_path2,outputroot)
     #  exit()
 pool.close()

@@ -1,6 +1,6 @@
 python test.py \
 	--encoder_checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
-	--checkpoint "/data3/leics/checkpoints/mesh/axis_mlp2/best_acc.pkl" \
+	--checkpoint "/data3/leics/checkpoints/mesh/axis_mlp_add/best_acc.pkl" \
 	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
 	--before_path "/data3/leics/dataset/mesh/single_pointcloud_before2049" \
 	--after_path "/data3/leics/dataset/mesh/single_pointcloud_after2049" \

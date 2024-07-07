@@ -52,7 +52,7 @@ def seed_torch(seed=12):
 #     vertices = rearrange(vertices,'b n pn c -> (b n) pn c')
 #     vertices = torch.bmm(vertices - centroids,R) + centroids + move
 #     return vertices
-
+from train import align_axis, get_center_and_axis
 # def transform_mesh(mesh,centroid,dof):
 #     '''
 #     vertices: [pt_num, 3]
@@ -86,7 +86,7 @@ def move_mesh(mesh,centroid,dof):
     mesh.vertices = vertices.cpu().numpy()
     return mesh
 
-def transform_teeth(index,centers):
+def transform_teeth(index,centers,RR):
     before_meshes = []
     meshes = []
     gt_meshes = []
@@ -100,7 +100,8 @@ def transform_teeth(index,centers):
             before_meshes.append(vedo.trimesh2vedo(before_mesh))
             # after_mesh = move_mesh(mesh,centroid[i],output[i])
             # after_mesh = transform_mesh(mesh,output[i])
-            mesh.vertices = mesh.vertices - mesh.centroid + centers[i].cpu().numpy()
+            # mesh.vertices = mesh.vertices - mesh.centroid + centers[i].cpu().numpy()
+            mesh.vertices = np.matmul((mesh.vertices - mesh.centroid),RR[i].cpu().numpy()) + centers[i].cpu().numpy()
             meshes.append(vedo.trimesh2vedo(mesh))
             gt_meshes.append(gt_mesh)
     mesh = vedo.merge(meshes)
@@ -110,6 +111,7 @@ def transform_teeth(index,centers):
     vedo.write(mesh,f'/data3/leics/outputs/after{index}.obj')
     vedo.write(before_mesh,f'/data3/leics/outputs/before{index}.obj')
     vedo.write(gt_mesh,f'/data3/leics/outputs/gt{index}.obj')
+    exit()
 
 
 # def chamfer_loss(before_points,after_points,centroids,outputs):
@@ -130,13 +132,15 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, axis, masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, after_axis, before_axis, masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
         centers = center_patch.to(torch.float32).cuda()
         Fs = np_Fs.cuda()
-        axis = axis.to(torch.float32).cuda()
+        after_axis = after_axis.to(torch.float32).cuda()
+        before_axis = before_axis.to(torch.float32).cuda()
+        axis = after_axis[:,:,:8]
         cordinates = coordinate_patch.to(torch.float32).cuda()
         before_points = before_points.to(torch.float32).cuda()
         after_points = after_points.to(torch.float32).cuda()
@@ -146,41 +150,39 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         n_samples += faces.shape[0]
         with torch.no_grad():
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, axis).to(torch.float32)
-            centers = outputs[:,:,:3]
-            print(masks[0][6])
-            print(outputs[0][6])
-            print(axis[0][6])
-            criterion = nn.MSELoss(reduction='none')
-            loss2 = criterion(axis[:,:,:3],outputs[:,:,:3]).sum(dim=-1)
-            center_loss = (loss2 * masks).sum()
+            # centers = outputs[:,:,:3]
+            # print(masks[0][6])
+            # print(outputs[0][6])
+            # print(axis[0][6])
+            # criterion = nn.MSELoss(reduction='none')
+            # loss2 = criterion(axis[:,:,:3],outputs[:,:,:3]).sum(dim=-1)
+            # center_loss = (loss2 * masks).sum()
 
-            criterion2 = nn.CosineEmbeddingLoss(reduction='none')
-            bs = axis.shape[0]
-            target = torch.ones(bs).cuda()
+            # criterion2 = nn.CosineEmbeddingLoss(reduction='none')
+            # bs = axis.shape[0]
+            # target = torch.ones(bs).cuda()
             # axis_loss = torch.FloatTensor([0.]).to(device)
             # for i in range(bs):
-            normal1 = rearrange(outputs[:,:,3:6],'b n c -> (b n) c')
-            gt_normal1 = rearrange(axis[:,:,3:6],'b n c -> (b n) c')
-            normal2 = rearrange(outputs[:,:,6:],'b n c -> (b n) c')
-            gt_normal2 = rearrange(axis[:,:,6:],'b n c -> (b n) c')
-            target = torch.ones(32*bs).to(device)
-            axis_loss = (criterion2(normal1,gt_normal1,target) + criterion2(normal2,gt_normal2,target))
-            axis_loss = (axis_loss * masks.flatten()).sum()
+            # normal1 = rearrange(outputs[:,:,3:6],'b n c -> (b n) c')
+            # gt_normal1 = rearrange(axis[:,:,3:6],'b n c -> (b n) c')
+            # normal2 = rearrange(outputs[:,:,6:],'b n c -> (b n) c')
+            # gt_normal2 = rearrange(axis[:,:,6:],'b n c -> (b n) c')
+            # target = torch.ones(32*bs).to(device)
+            # axis_loss = (criterion2(normal1,gt_normal1,target) + criterion2(normal2,gt_normal2,target))
+            # axis_loss = (axis_loss * masks.flatten()).sum()
             # loss2 = centroid_loss(centroid, after_centroid, outputs)
             # loss = chamfer_loss(before_points,after_points,outputs).mean()
-            loss = center_loss + axis_loss
-            print('loss:',loss)
-            exit()
-            # print(outputs)
-            # print(dofs)
-            # exit()
-            # for j in range(32):
-            #     predicted_centroid = centroid[0,j] + outputs[0,j,:3]
-            #     print('move:',outputs[0,j,:3])
-            #     print(predicted_centroid)
-            #     print(after_centroid[0,j])
+            # loss = center_loss + axis_loss
+            # print('loss:',loss)
+            predicted_centroid, gt_normal1, gt_normal2 = get_center_and_axis(outputs)
+            gt_normal1 = torch.nn.functional.normalize(gt_normal1,dim=-1)
+            gt_normal2 = torch.nn.functional.normalize(gt_normal2,dim=-1)
+            normal1 = before_axis[:,:,3:6]
+            normal2 = before_axis[:,:,6:]
+            RR = align_axis(normal1,normal2,gt_normal1,gt_normal2)
+            RR = rearrange(RR,'(b n) c1 c2 -> b n c1 c2', n=32)
             for i in range(index.shape[0]):
-                transform_teeth(index[i],centers[i])
+                transform_teeth(index[i],predicted_centroid[i],RR[i])
 
 if __name__ == '__main__':
     # seed_torch(seed=43)

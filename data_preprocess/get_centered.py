@@ -27,8 +27,8 @@ def single_center(dataroot, outputroot, obj_path):
     name = obj_path.name.split('.')[0]+'.obj'
     tri_mesh.export(os.path.join(outputroot,name))
 
-dataroot = Path('/data/lcs/dataset/created/single_normed_after')
-outputroot = '/data/lcs/dataset/created/single_normed_after_centered'   #
+dataroot = Path('/data3/leics/dataset/mesh/single_after')
+outputroot = '/data3/leics/dataset/rot_matrix/single_after_centered'   #
 os.makedirs(outputroot,exist_ok=True)
 pool = Pool(processes=64)
 for path in dataroot.iterdir():
