@@ -127,7 +127,7 @@ class Block(nn.Module):
 class PatchEmbed(nn.Module):
     """ Image to Patch Embedding
     """
-    def __init__(self, patch_size=2, in_chans=6, embed_dim=768):
+    def __init__(self, patch_size=2, in_chans=8, embed_dim=768):
         super().__init__()
         self.patch_size = patch_size
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
@@ -139,7 +139,7 @@ class PatchEmbed(nn.Module):
 
 
 class UViT(nn.Module):
-    def __init__(self, img_size=224, patch_size=2, in_chans=6, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4.,
+    def __init__(self, img_size=224, patch_size=2, in_chans=8, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4.,
                  qkv_bias=False, qk_scale=None, norm_layer=nn.LayerNorm, mlp_time_embed=False, num_classes=-1,
                  use_checkpoint=False, conv=False, skip=True):
         super().__init__()

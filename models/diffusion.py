@@ -68,7 +68,7 @@ class diffuse(nn.Module):
     @torch.no_grad()
     def ddim_sample(self, features,centroid=None):
         batch = features.shape[0]
-        shape = (batch, 32, 6)
+        shape = (batch, 32, 8)
         total_timesteps, sampling_timesteps, eta = self.timesteps, self.sampling_timesteps, self.eta
 
         # [-1, 0, 1, 2, ..., T-1] when sampling_timesteps == total_timesteps

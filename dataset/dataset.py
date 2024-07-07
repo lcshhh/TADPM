@@ -258,13 +258,13 @@ class FullTeethDataset(data.Dataset):
         after_centroid = np.zeros((32,3))
         index = self.indexes[idx]
         masks = np.zeros((32),dtype=np.int32)
-        dofs = torch.load(os.path.join(self.paramroot,f'{index}.pkl'))
+        # dofs = torch.load(os.path.join(self.paramroot,f'{index}.pkl'))
+        axis = np.load(os.path.join(self.paramroot,f'{index}.npy'))
+        axis = axis[:,:8]
         for i in range(32):
             obj_path = os.path.join(self.dataroot,f'{index}_{i}.obj')
             before_path = os.path.join(self.before_path,f'{index}_{i}.ply')
             after_path = os.path.join(self.after_path,f'{index}_{i}.ply')
-            # before_vertices_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_before2049',f'{index}_{i}.ply')
-            # after_vertices_path = os.path.join('/data3/leics/dataset/mesh/single_pointcloud_after2049',f'{index}_{i}.ply')
             if os.path.exists(obj_path) and os.path.exists(before_path) and os.path.exists(after_path):
                 try:
                     feats[i], center[i], cordinates[i], faces[i], Fs[i]= load_mesh_shape(obj_path, 
@@ -279,7 +279,7 @@ class FullTeethDataset(data.Dataset):
                 after = read_pointcloud(after_path)
                 after_points[i] = after[:point_num]
                 after_centroid[i] = after[point_num]
-        return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,dofs,masks
+        return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,axis,masks
         # return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,before_points_centered
 
 

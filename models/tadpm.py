@@ -40,9 +40,9 @@ class TADPM(nn.Module):
                 nn.Linear(1024, 512),
                 # nn.Dropout(0.3),
                 nn.GELU(),
-                nn.Linear(512,128),
+                nn.Linear(512,256),
                 nn.GELU(),
-                nn.Linear(128, 6)
+                nn.Linear(256, 8)
             )
         else:
             self.regressor = diffuse(1827)
@@ -99,6 +99,7 @@ class TADPM(nn.Module):
         global_embedding = self.global_encoder(global_points).unsqueeze(1).repeat(1,n,1)
         embedding = torch.cat([global_embedding,trans_feature,centroid],dim=-1)
         embedding = self.ln(embedding)
+
         # embedding = self.bn2(embedding.transpose(1,2)).transpose(1,2)
         # embedding = embedding.mean(dim=1)
         if self.use_mlp:

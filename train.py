@@ -107,48 +107,17 @@ def chamfer_loss2(index,outputs):
                 cd_loss,_ = chamfer_distance(after_points.unsqueeze(0), predicted_points.unsqueeze(0), point_reduction="sum", norm=1)
                 loss += cd_loss
     return loss/bs
-    
-            
 
-def add_loss(before_points,after_points,outputs,masks=None):
-    bs = before_points.shape[0]
-    loss = torch.FloatTensor([0]).cuda()
-    outputs = rearrange(outputs,'b n c -> (b n) c')
-    trans_matrix = se3_exp_map(outputs).transpose(1,2)
-    before_points = rearrange(before_points,'b n p c -> (b n) p c')
-    after_points = rearrange(after_points,'b n p c -> (b n) p c')
-    riged_tar = Transform3d(matrix=trans_matrix.transpose(1,2)).transform_points(before_points)
-    criterion = nn.MSELoss(reduction='none')
-    # if masks is not None:
-    #     loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", batch_reduction=None, norm=1)
-    #     loss = (loss * masks.view(loss.shape)).mean()
-    # else:
-    #     loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
-    loss = criterion(after_points,riged_tar).sum(dim=(1,2))
-    loss = (loss * masks.view(loss.shape)).sum()
-    return loss/bs
+def get_axis(x):
+    '''
+    x:[bs,32,8]
+    '''
+    normal1 = x[:,:,:3]
+    normal2 = torch.zeros_like(normal1).to(normal1.device)
+    normal2[:,:,:2] = x[:,:,3:]
+    normal2[:,2] = -(normal1[:,0]*x[:,3]+normal1[:,1]*x[:,4])/normal1[:,2]
+    return normal1,normal2
 
-# def centroid_loss(before_centroids,after_centroids,outputs,mask=None):
-#     '''
-#     before_centroids:[bs, 32, 3]
-#     after_centroids:[bs, 32, 3]
-#     outputs:[bs, 32, 6]
-#     '''
-#     bs = before_centroids.shape[0]
-#     n = before_centroids.shape[1]
-#     predicted_centrodis = before_centroids + outputs[:,:,:3]
-#     criterion = nn.MSELoss(reduction='none')
-#     loss = criterion(after_centroids,predicted_centrodis).sum(dim=-1)
-#     loss = (loss * mask.float()).sum()
-#     non_zero_elements = mask.sum()
-#     mse_loss_val = loss / non_zero_elements
-#     # predicted_points = transform_vertices(before_points, centroids, outputs)
-#     # after_points = rearrange(after_points,'b n pn c -> (b n) pn c')
-#     # mask = repeat(mask,'b n -> (b n) np c', np=np, c=3)
-#     # predicted_points = predicted_points.masked_fill(mask,value=0)
-#     # after_points = after_points.masked_fill(mask,value=0)
-#     # loss, _ = chamfer_distance(after_points, predicted_points, point_reduction="sum", norm=2)
-#     return mse_loss_val
 
 def centroid_loss(centroid,after_centroid,outputs):
     '''
@@ -169,7 +138,7 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,dofs,masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,axis,masks) in enumerate(
             train_dataset):
         optim.zero_grad()
         faces = face_patch.to(torch.float32).cuda()
@@ -179,7 +148,7 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         cordinates = coordinate_patch.cuda()
         centroid = centroid.to(torch.float32).cuda()
         after_centroid = after_centroid.to(torch.float32).cuda()
-        dofs = dofs.to(torch.float32).cuda()
+        axis = axis.to(torch.float32).cuda()
         masks = masks.cuda()
         n_samples += faces.shape[0]
         before_points = before_points.to(torch.float32).cuda()
@@ -187,16 +156,28 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         if args.use_mlp:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
         else:
-            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
-        # loss1 = chamfer_loss(before_points,after_points,outputs/10, masks)
-        # loss1 = chamfer_loss2(index,outputs/10)
-        loss1 = add_loss(before_points,after_points,outputs/10,masks)
+            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, axis).to(torch.float32).cuda()
         criterion = nn.MSELoss(reduction='none')
-        loss2 = criterion(dofs,outputs/10).sum(dim=-1)
-        loss2 = 3*(loss2 * masks).sum()
+        loss2 = criterion(axis[:,:,:3],outputs[:,:,:3]).sum(dim=-1)
+        center_loss = (loss2 * masks).sum()
+
+        criterion2 = nn.CosineEmbeddingLoss(reduction='none')
+        bs = axis.shape[0]
+        target = torch.ones(bs).cuda()
+        # axis_loss = torch.FloatTensor([0.]).to(device)
+        # for i in range(bs):
+        normal1 = rearrange(outputs[:,:,3:6],'b n c -> (b n) c')
+        gt_normal1 = rearrange(axis[:,:,3:6],'b n c -> (b n) c')
+        normal2 = rearrange(outputs[:,:,6:],'b n c -> (b n) c')
+        gt_normal2 = rearrange(axis[:,:,6:],'b n c -> (b n) c')
+        target = torch.ones(32*bs).to(device)
+        axis_loss = (criterion2(normal1,gt_normal1,target) + criterion2(normal2,gt_normal2,target))
+        axis_loss = (axis_loss * masks.flatten()).sum()
         # loss2 = centroid_loss(centroid, after_centroid, outputs)
         # loss = chamfer_loss(before_points,after_points,outputs).mean()
-        loss = loss2 + loss1
+        loss = center_loss + axis_loss
+        print(center_loss)
+        print(axis_loss)
         # print('centroid loss:',loss2)
         # loss = loss2
         loss.backward()
@@ -224,7 +205,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, dofs,masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, axis,masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
@@ -236,7 +217,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         centroid = centroid.to(torch.float32).cuda()
         after_centroid = after_centroid.to(torch.float32).cuda()
         # masks = (masks>0).cuda()
-        dofs = dofs.to(torch.float32).cuda()
+        axis = axis.to(torch.float32).cuda()
         masks = masks.cuda()
         # trans_matrix = trans_matrix.to(torch.float32).cuda()
         n_samples += faces.shape[0]
@@ -245,10 +226,28 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
             if args.use_mlp:
                 outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
             else:
-                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, dofs).to(torch.float32).cuda()
+                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, axis).to(torch.float32).cuda()
             # loss = 512*chamfer_loss(before_points,after_points,centroid, outputs, masks)
             # loss = chamfer_loss(before_points,after_points,outputs/10, masks)
-            loss = add_loss(before_points,after_points,outputs/10,masks)
+            criterion = nn.MSELoss(reduction='none')
+            loss2 = criterion(axis[:,:,:3],outputs[:,:,:3]).sum(dim=-1)
+            center_loss = (loss2 * masks).sum()
+
+            criterion2 = nn.CosineEmbeddingLoss(reduction='none')
+            bs = axis.shape[0]
+            target = torch.ones(bs).cuda()
+            # axis_loss = torch.FloatTensor([0.]).to(device)
+            # for i in range(bs):
+            normal1 = rearrange(outputs[:,:,3:6],'b n c -> (b n) c')
+            gt_normal1 = rearrange(axis[:,:,3:6],'b n c -> (b n) c')
+            normal2 = rearrange(outputs[:,:,6:],'b n c -> (b n) c')
+            gt_normal2 = rearrange(axis[:,:,6:],'b n c -> (b n) c')
+            target = torch.ones(32*bs).to(device)
+            axis_loss = (criterion2(normal1,gt_normal1,target) + criterion2(normal2,gt_normal2,target))
+            axis_loss = (axis_loss * masks.flatten()).sum()
+            # loss2 = centroid_loss(centroid, after_centroid, outputs)
+            # loss = chamfer_loss(before_points,after_points,outputs).mean()
+            loss = center_loss + axis_loss
             running_loss += loss.item() * faces.size(0)
             progress_bar(it, len(test_dataset), 'Test Loss: %.3f'% (running_loss/n_samples))
 
@@ -316,9 +315,7 @@ if __name__ == '__main__':
     # train_dataset = dataManager.train_dataset()
     # test_dataset = dataManager.test_dataset()
     train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,2048)
-    args.before_path = '/data3/leics/dataset/mesh/single_pointcloud_before2049'
-    args.after_path = '/data3/leics/dataset/mesh/single_pointcloud_after2049'
-    test_dataset = FullTeethDataset('/data3/leics/dataset/mesh/remesh_before','/data3/leics/dataset/mesh/param','val.txt',False,args,2048)
+    test_dataset = FullTeethDataset(dataroot,paramroot,'val.txt',False,args,2048)
     print(len(train_dataset))
     print(len(test_dataset))
     train_data_loader = data.DataLoader(train_dataset, num_workers=args.n_worker, batch_size=args.batch_size,
@@ -329,6 +326,7 @@ if __name__ == '__main__':
     net = TADPM(args).to(device)
     net = nn.DataParallel(net)
     if args.checkpoint != '':
+        print('...loading...')
         checkpoint = torch.load(args.checkpoint)
         net.load_state_dict(checkpoint['model'],strict=True)
     print("Let's use", torch.cuda.device_count(), "GPUs!")
@@ -339,14 +337,15 @@ if __name__ == '__main__':
     if args.optim.lower() == 'adamw':
         optimizer = optim.AdamW(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
-    if args.lr_milestones.lower() != 'none':
-        ms = args.lr_milestones
-        ms = ms.split()
-        ms = [int(j) for j in ms]
-        scheduler = MultiStepLR(optimizer, milestones=ms, gamma=0.1)
-    else:
-        scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=int(args.num_warmup_steps),
-                                                    num_training_steps=args.n_epoch + 1)
+    # if args.lr_milestones.lower() != 'none':
+    #     ms = args.lr_milestones
+    #     ms = ms.split()
+    #     ms = [int(j) for j in ms]
+    #     scheduler = MultiStepLR(optimizer, milestones=ms, gamma=0.1)
+    # else:
+    #     scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=int(args.num_warmup_steps),
+    #                                                 num_training_steps=args.n_epoch + 1)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.n_epoch)
     checkpoint_names = []
     checkpoint_path = os.path.join(args.saveroot, args.name)
 

@@ -129,13 +129,13 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, dofs, masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, axis, masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
         centers = center_patch.to(torch.float32).cuda()
         Fs = np_Fs.cuda()
-        dofs = dofs.to(torch.float32).cuda()
+        axis = axis.to(torch.float32).cuda()
         cordinates = coordinate_patch.to(torch.float32).cuda()
         before_points = before_points.to(torch.float32).cuda()
         after_points = after_points.to(torch.float32).cuda()
@@ -144,7 +144,31 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         masks = masks.cuda()
         n_samples += faces.shape[0]
         with torch.no_grad():
-            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32)
+            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, axis).to(torch.float32)
+            print(masks[0][6])
+            print(outputs[0][6])
+            print(axis[0][6])
+            criterion = nn.MSELoss(reduction='none')
+            loss2 = criterion(axis[:,:,:3],outputs[:,:,:3]).sum(dim=-1)
+            center_loss = (loss2 * masks).sum()
+
+            criterion2 = nn.CosineEmbeddingLoss(reduction='none')
+            bs = axis.shape[0]
+            target = torch.ones(bs).cuda()
+            # axis_loss = torch.FloatTensor([0.]).to(device)
+            # for i in range(bs):
+            normal1 = rearrange(outputs[:,:,3:6],'b n c -> (b n) c')
+            gt_normal1 = rearrange(axis[:,:,3:6],'b n c -> (b n) c')
+            normal2 = rearrange(outputs[:,:,6:],'b n c -> (b n) c')
+            gt_normal2 = rearrange(axis[:,:,6:],'b n c -> (b n) c')
+            target = torch.ones(32*bs).to(device)
+            axis_loss = (criterion2(normal1,gt_normal1,target) + criterion2(normal2,gt_normal2,target))
+            axis_loss = (axis_loss * masks.flatten()).sum()
+            # loss2 = centroid_loss(centroid, after_centroid, outputs)
+            # loss = chamfer_loss(before_points,after_points,outputs).mean()
+            loss = center_loss + axis_loss
+            print('loss:',loss)
+            exit()
             # print(outputs)
             # print(dofs)
             # exit()
@@ -204,23 +228,21 @@ if __name__ == '__main__':
     # dataManager = OriginalFullTeethDataManager(dataroot,paramroot,args.train_ratio,)
     # train_dataset = dataManager.train_dataset()
     # test_dataset = dataManager.test_dataset()
-    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,512)
-    args.before_path = '/data3/leics/dataset/mesh/single_pointcloud_before2049'
-    args.after_path = '/data3/leics/dataset/mesh/single_pointcloud_after2049'
-    test_dataset = FullTeethDataset(dataroot,'/data3/leics/dataset/mesh/param','val.txt',False,args,2048)
+    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,2048)
+    test_dataset = FullTeethDataset(dataroot,paramroot,'val.txt',False,args,2048)
     print(len(train_dataset))
     print(len(test_dataset))
     train_data_loader = data.DataLoader(train_dataset, num_workers=args.n_worker, batch_size=args.batch_size,
-                                        shuffle=True, pin_memory=True)
+                                        shuffle=True, pin_memory=True, drop_last=True)
     test_data_loader = data.DataLoader(test_dataset, num_workers=args.n_worker, batch_size=args.batch_size,
                                        shuffle=False, pin_memory=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = TADPM(args).to(device)
     net = nn.DataParallel(net)
-    # if args.checkpoint != '':
-    #     checkpoint = torch.load(args.checkpoint)
-    #     print('loading model...')
-    #     net.load_state_dict(checkpoint['model'],strict=True)
+    if args.checkpoint != '':
+        checkpoint = torch.load(args.checkpoint)
+        print('loading model...')
+        net.load_state_dict(checkpoint['model'],strict=True)
     print("Let's use", torch.cuda.device_count(), "GPUs!")
     # if args.mode != 'train':
     
