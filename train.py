@@ -52,24 +52,6 @@ def transform_vertices(vertices,centroids,dofs):
     vertices = rearrange(vertices,'b n pn c -> (b n) pn c')
     vertices = torch.bmm(vertices - centroids,R) + centroids + move
     return vertices
-    
-
-# def chamfer_loss(before_points,after_points,centroids,outputs,mask=None):
-#     '''
-#     outputs: [bs,teeth_num,6]
-#     before_points: [bs,teeth_num,point_num,3]
-#     mask: [bs,32]
-#     '''
-#     bs = before_points.shape[0]
-#     np = before_points.shape[2]
-#     predicted_points = transform_vertices(before_points, centroids, outputs)
-#     after_points = rearrange(after_points,'b n pn c -> (b n) pn c')
-#     mask = repeat(mask,'b n -> (b n) np c', np=np, c=3)
-#     bool_mask = (mask < 0.5)
-#     predicted_points = predicted_points.masked_fill(bool_mask,value=0)
-#     after_points = after_points.masked_fill(bool_mask,value=0)
-#     loss, _ = chamfer_distance(after_points, predicted_points, point_reduction="mean", norm=1)
-#     return loss
 
 def chamfer_loss(before_points,after_points,outputs,masks=None):
     '''
@@ -90,23 +72,70 @@ def chamfer_loss(before_points,after_points,outputs,masks=None):
         loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
     return loss/bs
 
-def chamfer_loss2(index,outputs):
-    bs = index.shape[0]
-    loss = torch.FloatTensor([0.]).cuda()
-    for j in range(bs):
-        trans_matrix = se3_exp_map(outputs[j]).transpose(1,2)
-        for i in range(32):
-            before_path = os.path.join('/data3/leics/dataset/mesh/single_before',f'{index[j]}_{i}.obj')
-            after_path = os.path.join('/data3/leics/dataset/mesh/single_after',f'{index[j]}_{i}.obj')
-            if os.path.exists(before_path) and os.path.exists(after_path):
-                before_mesh = trimesh.load_mesh(before_path)
-                after_mesh = trimesh.load_mesh(after_path)
-                before_points = torch.FloatTensor(before_mesh.vertices).cuda()
-                after_points = torch.FloatTensor(after_mesh.vertices).cuda()
-                predicted_points = Transform3d(matrix=trans_matrix.transpose(1,2)[i]).transform_points(before_points)
-                cd_loss,_ = chamfer_distance(after_points.unsqueeze(0), predicted_points.unsqueeze(0), point_reduction="sum", norm=1)
-                loss += cd_loss
-    return loss/bs
+def rotation_matrix(vec1, vec2):
+    """ Find the rotation matrix that aligns vec1 to vec2
+    :param vec1: A 3d "source" vector
+    :param vec2: A 3d "destination" vector
+    :return mat: A transform matrix (3x3) which when applied to vec1, aligns it with vec2.
+    """
+    # a, b = (vec1 / np.linalg.norm(vec1)).reshape(3), (vec2 / np.linalg.norm(vec2)).reshape(3)
+
+
+    bs = vec1.shape[0]
+    a = nn.functional.normalize(vec1,dim=-1)
+    b = nn.functional.normalize(vec2,dim=-1)
+    n_vector = torch.cross(a, b, dim=-1)
+    c = torch.sum(a*b,dim=-1)
+    s = torch.norm(n_vector,dim=-1)
+    # s.masked_fill_(masks.flatten(),1)
+    n_matrix = torch.zeros(bs,3,3).to(device)
+    for i in range(bs):
+        n_matrix[i] = torch.tensor([[0, -n_vector[i,2], n_vector[i,1]],
+                             [n_vector[i,2], 0, -n_vector[i,0]],
+                             [-n_vector[i,1], n_vector[i,0], 0]], dtype=torch.float32)
+    I = torch.stack([torch.eye(3) for _ in range(bs)],dim=0).to(device)
+    rotation_matrix = I + n_matrix + ((torch.bmm(n_matrix,n_matrix) * ((1 - c.view(-1,1,1)) / (s.view(-1,1,1) ** 2))))
+    return rotation_matrix
+
+def rotation_matrix_with_axis(theta, v):
+    """
+    创建绕任意轴旋转的旋转矩阵
+    :param theta: 旋转角度（弧度）
+    :param v: 旋转轴的单位向量
+    :return: 旋转矩阵
+    """
+    bs = theta.shape[0]
+    K = torch.zeros(bs,3,3).to(device)
+    for i in range(bs):
+        K[i] = torch.tensor([[0, -v[i,2], v[i,1]],
+                        [v[i,2], 0, -v[i,0]],
+                        [-v[i,1], v[i,0], 0]]).to(device)
+    I = torch.stack([torch.eye(3) for _ in range(bs)],dim=0).to(device)
+    R = I + torch.sin(theta).view(-1,1,1) * K + (1 - torch.cos(theta).view(-1,1,1)) * torch.bmm(K, K)
+    return R
+
+def align_axis(normal1,normal2,gt_normal1,gt_normal2):
+    rot_matrix = rotation_matrix(gt_normal1.view(-1,3),normal1.view(-1,3)).transpose(2,1) #将z轴对齐
+
+    after_axis = torch.bmm(gt_normal2.view(-1,3).unsqueeze(1),rot_matrix)
+    rho = torch.cross(after_axis.squeeze(1), normal2.view(-1,3),dim=-1)
+    eps = 1e-7
+    theta = torch.acos(torch.clamp(torch.sum(normal2.view(-1,3)*after_axis.squeeze(1),dim=-1),min=-1+eps,max=1-eps)).to(device)
+    theta = -torch.sign(torch.sum(normal1.view(-1,3)*rho,dim=-1)) * theta
+    R = rotation_matrix_with_axis(theta,normal1.view(-1,3))
+    RR = torch.bmm(rot_matrix,R)
+    return RR
+
+def get_center_and_axis(x):
+    '''
+    x:[bs,32,8]
+    '''
+    centers = x[:,:,:3]
+    normal1 = x[:,:,3:6]
+    normal2 = torch.zeros_like(normal1).to(normal1.device)
+    normal2[:,:,:2] = x[:,:,6:]
+    normal2[:,:,2] = -(normal1[:,:,0]*x[:,:,6]+normal1[:,:,1]*x[:,:,7])/normal1[:,:,2]
+    return centers,normal1,normal2
 
 def get_axis(x):
     '''
@@ -133,12 +162,23 @@ def centroid_loss(centroid,after_centroid,outputs):
         loss += torch.abs(pre_dis - after_dis).sum()
     return loss/bs
 
+def cal_add_loss(before_points,after_points,RR,predicted_centroid,centroid, masks):
+    points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
+    predicted_points = torch.bmm(points,RR)
+    predicted_points = predicted_points + rearrange(predicted_centroid,'b n c -> (b n) c').unsqueeze(1)
+    after_points = rearrange(after_points,'b n p c -> (b n) p c')
+    criterion = nn.MSELoss(reduction='none')
+    add_loss = criterion(predicted_points,after_points).sum(dim=(-1,-2))
+    add_loss = (add_loss * masks.flatten()).sum()
+    return add_loss
+
+
 def train(net, optim, names, scheduler, train_dataset, epoch, args):
     net.train()
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,axis,masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,after_axis,before_axis,masks) in enumerate(
             train_dataset):
         optim.zero_grad()
         faces = face_patch.to(torch.float32).cuda()
@@ -148,7 +188,9 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         cordinates = coordinate_patch.cuda()
         centroid = centroid.to(torch.float32).cuda()
         after_centroid = after_centroid.to(torch.float32).cuda()
-        axis = axis.to(torch.float32).cuda()
+        after_axis = after_axis.to(torch.float32).cuda()
+        axis = after_axis[:,:,:8]
+        before_axis = before_axis.to(torch.float32).cuda()
         masks = masks.cuda()
         n_samples += faces.shape[0]
         before_points = before_points.to(torch.float32).cuda()
@@ -158,26 +200,33 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         else:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, axis).to(torch.float32).cuda()
         criterion = nn.MSELoss(reduction='none')
-        loss2 = criterion(axis[:,:,:3],outputs[:,:,:3]).sum(dim=-1)
+        loss2 = criterion(axis,outputs).sum(dim=-1)
         center_loss = (loss2 * masks).sum()
 
-        criterion2 = nn.CosineEmbeddingLoss(reduction='none')
-        bs = axis.shape[0]
-        target = torch.ones(bs).cuda()
-        # axis_loss = torch.FloatTensor([0.]).to(device)
-        # for i in range(bs):
-        normal1 = rearrange(outputs[:,:,3:6],'b n c -> (b n) c')
-        gt_normal1 = rearrange(axis[:,:,3:6],'b n c -> (b n) c')
-        normal2 = rearrange(outputs[:,:,6:],'b n c -> (b n) c')
-        gt_normal2 = rearrange(axis[:,:,6:],'b n c -> (b n) c')
-        target = torch.ones(32*bs).to(device)
-        axis_loss = (criterion2(normal1,gt_normal1,target) + criterion2(normal2,gt_normal2,target))
-        axis_loss = (axis_loss * masks.flatten()).sum()
+        # criterion2 = nn.CosineEmbeddingLoss(reduction='none')
+        # bs = axis.shape[0]
+        # target = torch.ones(bs).cuda()
+        # # axis_loss = torch.FloatTensor([0.]).to(device)
+        # # for i in range(bs):
+        # normal1 = rearrange(outputs[:,:,3:6],'b n c -> (b n) c')
+        # gt_normal1 = rearrange(axis[:,:,3:6],'b n c -> (b n) c')
+        # normal2 = rearrange(outputs[:,:,6:],'b n c -> (b n) c')
+        # gt_normal2 = rearrange(axis[:,:,6:],'b n c -> (b n) c')
+        # target = torch.ones(32*bs).to(device)
+        # axis_loss = (criterion2(normal1,gt_normal1,target) + criterion2(normal2,gt_normal2,target))
+        # axis_loss = (axis_loss * masks.flatten()).sum()
         # loss2 = centroid_loss(centroid, after_centroid, outputs)
         # loss = chamfer_loss(before_points,after_points,outputs).mean()
-        loss = center_loss + axis_loss
-        print(center_loss)
-        print(axis_loss)
+        predicted_centroid, gt_normal1, gt_normal2 = get_center_and_axis(outputs)
+        gt_normal1 = torch.nn.functional.normalize(gt_normal1,dim=-1)
+        gt_normal2 = torch.nn.functional.normalize(gt_normal2,dim=-1)
+        normal1 = before_axis[:,:,3:6]
+        normal2 = before_axis[:,:,6:]
+        RR = align_axis(normal1,normal2,gt_normal1,gt_normal2)
+        add_loss = 0.1*cal_add_loss(before_points,after_points,RR,predicted_centroid,centroid,masks)
+        print('center_loss:',center_loss)
+        print('add_loss',add_loss)
+        loss = center_loss + add_loss
         # print('centroid loss:',loss2)
         # loss = loss2
         loss.backward()

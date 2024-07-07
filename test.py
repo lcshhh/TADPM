@@ -86,7 +86,7 @@ def move_mesh(mesh,centroid,dof):
     mesh.vertices = vertices.cpu().numpy()
     return mesh
 
-def transform_teeth(index,centroid,output):
+def transform_teeth(index,centers):
     before_meshes = []
     meshes = []
     gt_meshes = []
@@ -99,8 +99,9 @@ def transform_teeth(index,centroid,output):
             before_mesh = trimesh.load_mesh(path)
             before_meshes.append(vedo.trimesh2vedo(before_mesh))
             # after_mesh = move_mesh(mesh,centroid[i],output[i])
-            after_mesh = transform_mesh(mesh,output[i])
-            meshes.append(vedo.trimesh2vedo(after_mesh))
+            # after_mesh = transform_mesh(mesh,output[i])
+            mesh.vertices = mesh.vertices - mesh.centroid + centers[i].cpu().numpy()
+            meshes.append(vedo.trimesh2vedo(mesh))
             gt_meshes.append(gt_mesh)
     mesh = vedo.merge(meshes)
     before_mesh = vedo.merge(before_meshes)
@@ -145,6 +146,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         n_samples += faces.shape[0]
         with torch.no_grad():
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, axis).to(torch.float32)
+            centers = outputs[:,:,:3]
             print(masks[0][6])
             print(outputs[0][6])
             print(axis[0][6])
@@ -178,7 +180,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
             #     print(predicted_centroid)
             #     print(after_centroid[0,j])
             for i in range(index.shape[0]):
-                transform_teeth(index[i],centroid[i],outputs[i]/10)
+                transform_teeth(index[i],centers[i])
 
 if __name__ == '__main__':
     # seed_torch(seed=43)
