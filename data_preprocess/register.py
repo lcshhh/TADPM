@@ -26,22 +26,24 @@ def registration(index,save_path):
 
 def register(index,dataroot1,dataroot2,outputroot):
      # dofs = torch.zeros(32,6)
-     rot_matrix = torch.zeros(32,3,3)
+     index = 292
+     rot_matrix = torch.zeros(32,4,4)
      for i in range(32):
-        obj_path1 = os.path.join(dataroot1,f'{292}_{i}.obj')
-        obj_path2 = os.path.join(dataroot2,f'{292}_{i}.obj')
+        obj_path1 = os.path.join(dataroot1,f'{index}_{i}.obj')
+        obj_path2 = os.path.join(dataroot2,f'{index}_{i}.obj')
         if os.path.exists(obj_path1) and os.path.exists(obj_path2):
             mesh1 = trimesh.load_mesh(obj_path1)
             mesh2 = trimesh.load_mesh(obj_path2)
             points = mesh1.sample(2048)
-            matrix = trimesh.registration.icp(points,mesh2,scale=False,max_iterations=20)[0]
+          #   matrix1 = trimesh.registration.icp(points,mesh2,scale=False,translation=False,max_iterations=20)[0]
+            matrix = trimesh.registration.icp(points,mesh2,scale=False,max_iterations=50)[0]
+            
           #   dofs[i] = se3_log_map(torch.from_numpy(matrix).transpose(0,1).unsqueeze(0))
           #   matrix = matrix[:6]
-            rot_matrix[i] = torch.from_numpy(matrix[:3,:3])
-            print(matrix)
+            rot_matrix[i] = torch.from_numpy(matrix)
           #   exit()
      # torch.save(dofs,os.path.join(outputroot,f'{index}.pkl'))
-     torch.save(rot_matrix,os.path.join(outputroot,f'{292}.pkl'))
+     torch.save(rot_matrix,os.path.join(outputroot,f'{index}.pkl'))
 
 
 

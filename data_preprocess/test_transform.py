@@ -41,9 +41,9 @@ def transform_mesh(mesh,dof):
     centroid [bs,16,3]
     '''
     bs = dof.shape[0]
-    trans_matrix = se3_exp_map(dof.unsqueeze(0)).transpose(2,1) # [16,4,4]
+    # trans_matrix = se3_exp_map(dof.unsqueeze(0)).transpose(2,1) # [16,4,4]
     vertices = torch.from_numpy(mesh.vertices).to(dof.device).float()
-    predicted_vertices = Transform3d(matrix=trans_matrix.transpose(2,1)[0]).transform_points(vertices)
+    predicted_vertices = Transform3d(matrix=dof).transform_points(vertices)
     mesh.vertices = predicted_vertices
     return mesh
 
@@ -113,11 +113,18 @@ for i in range(32):
     predicted_mesh = trimesh.load_mesh(f'/data3/leics/dataset/rot_matrix/single_before_centered/{index}_{i}.obj')
     gt_mesh = trimesh.load_mesh(f'/data3/leics/dataset/rot_matrix/single_after_centered/{index}_{i}.obj')
     before_mesh = trimesh.load_mesh(path)
-    # predicted_mesh = transform_mesh(mesh,dof[i])
-    predicted_mesh.vertices = np.matmul(predicted_mesh.vertices,rot_matrix[i])
+    predicted_mesh = transform_mesh(mesh,rot_matrix[i])
+    # predicted_mesh.vertices = torch.mm(torch.from_numpy(predicted_mesh.vertices).to(torch.float32),rot_matrix[i].transpose(0,1))
     add = cal_add(predicted_mesh,gt_mesh)
     print(add)
     meshes.append(vedo.trimesh2vedo(predicted_mesh))
     before_meshes.append(vedo.trimesh2vedo(before_mesh))
     gt_meshes.append(vedo.trimesh2vedo(gt_mesh))
+
+    # before_mesh = vedo.merge(before_meshes)
+    vedo.write(vedo.trimesh2vedo(before_mesh),f'/data3/leics/dataset/mesh/before{index}_{i}.obj')
+    # after_mesh = vedo.merge(meshes)
+    vedo.write(vedo.trimesh2vedo(predicted_mesh),f'/data3/leics/dataset/mesh/after{index}_{i}.obj')
+    # before_mesh = vedo.merge(before_meshes)
+    vedo.write(vedo.trimesh2vedo(gt_mesh),f'/data3/leics/dataset/mesh/gt{index}_{i}.obj')
     
