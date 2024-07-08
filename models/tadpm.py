@@ -30,7 +30,7 @@ class TADPM(nn.Module):
             decoder_num_heads=args.decoder_num_heads,
             decoder_depth=args.decoder_depth
         )
-        self.encoder.requires_grad_(False)
+        # self.encoder.requires_grad_(False)
         self.use_mlp = args.use_mlp
         if self.use_mlp:
             self.regressor = nn.Sequential(
@@ -42,8 +42,19 @@ class TADPM(nn.Module):
                 nn.GELU(),
                 nn.Linear(512,256),
                 nn.GELU(),
-                nn.Linear(256, 8)
+                nn.Linear(256, 9)
             )
+            # self.regressor = nn.Sequential(
+            #     nn.Linear(1827, 1024),
+            #     # nn.Dropout(0.3),
+            #     nn.GELU(),
+            #     nn.Linear(1024, 512),
+            #     # nn.Dropout(0.3),
+            #     nn.GELU(),
+            #     nn.Linear(512,32*9),
+            #     nn.GELU(),
+            #     nn.Linear(32*9, 32*9)
+            # )
         else:
             self.regressor = diffuse(1827)
         embed_dim = args.dim
@@ -72,7 +83,7 @@ class TADPM(nn.Module):
             if isinstance(layer, nn.Linear):
                 # 使用 Xavier 初始化
                 nn.init.xavier_uniform_(layer.weight)
-                # nn.init.zeros_(layer.bias)
+                nn.init.zeros_(layer.bias)
             if isinstance(layer, nn.Conv2d):
                 # 使用 Xavier 初始化
                 nn.init.xavier_uniform_(layer.weight)
@@ -99,6 +110,7 @@ class TADPM(nn.Module):
         global_embedding = self.global_encoder(global_points).unsqueeze(1).repeat(1,n,1)
         embedding = torch.cat([global_embedding,trans_feature,centroid],dim=-1)
         embedding = self.ln(embedding)
+        # embedding = torch.mean(embedding,dim=1)
 
         # embedding = self.bn2(embedding.transpose(1,2)).transpose(1,2)
         # embedding = embedding.mean(dim=1)

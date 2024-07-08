@@ -258,10 +258,6 @@ class FullTeethDataset(data.Dataset):
         after_centroid = np.zeros((32,3))
         index = self.indexes[idx]
         masks = np.zeros((32),dtype=np.int32)
-        # dofs = torch.load(os.path.join(self.paramroot,f'{index}.pkl'))
-        axis = np.load(os.path.join(self.paramroot,f'{index}.npy'))
-        # axis = axis[:,:8]
-        before_axis = np.load(os.path.join('/data3/leics/dataset/mesh/single_before_axis',f'{index}.npy'))
         for i in range(32):
             obj_path = os.path.join(self.dataroot,f'{index}_{i}.obj')
             before_path = os.path.join(self.before_path,f'{index}_{i}.ply')
@@ -280,7 +276,7 @@ class FullTeethDataset(data.Dataset):
                 after = read_pointcloud(after_path)
                 after_points[i] = after[:point_num]
                 after_centroid[i] = after[point_num]
-        return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,axis,before_axis,masks
+        return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,masks
         # return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,before_points_centered
 
 

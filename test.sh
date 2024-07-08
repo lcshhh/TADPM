@@ -1,11 +1,11 @@
 python test.py \
 	--encoder_checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
-	--checkpoint "/data3/leics/checkpoints/mesh/axis_mlp_add/best_acc.pkl" \
+	--checkpoint "/data3/leics/checkpoints/rot/rot2_1e-4/best_acc.pkl" \
 	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
-	--before_path "/data3/leics/dataset/mesh/single_pointcloud_before2049" \
-	--after_path "/data3/leics/dataset/mesh/single_pointcloud_after2049" \
+	--before_path "/data3/leics/dataset/mesh/single_pointcloud_before256" \
+	--after_path "/data3/leics/dataset/mesh/single_pointcloud_after256" \
 	--paramroot "/data3/leics/dataset/mesh/single_after_axis_revert" \
-	--batch_size 32 --n_classes 40 \
+	--batch_size 4 --n_classes 40 \
 	--n_epoch 700 \
 	--name "axis" \
 	--weight_decay 0.05 \

@@ -99,21 +99,23 @@ def cal_add(mesh1,mesh2):
 # vedo.write(gt_mesh,'/data3/leics/dataset/created/gt.obj')
 # merge_mesh(177)
 
-paramroot = '/data3/leics/dataset/created/params'
-
-dof = torch.load(os.path.join(paramroot,f'0.pkl')).float()
+paramroot = '/data3/leics/dataset/rot_matrix/param'
+index = 292
+rot_matrix = torch.load(os.path.join(paramroot,f'{index}.pkl')).float()
 meshes = []
 before_meshes = []
 gt_meshes = []
 for i in range(32):
-    path = f'/data3/leics/dataset/created/single_before/0_{i}.obj'
+    path = f'/data3/leics/dataset/rot_matrix/single_before_centered/{index}_{i}.obj'
     if not os.path.exists(path):
         continue
-    mesh = trimesh.load_mesh(f'/data3/leics/dataset/created/single_before/0_{i}.obj')
-    gt_mesh = trimesh.load_mesh(f'/data3/leics/dataset/created/single_after/0_{i}.obj')
+    mesh = trimesh.load_mesh(f'/data3/leics/dataset/rot_matrix/single_before_centered/{index}_{i}.obj')
+    predicted_mesh = trimesh.load_mesh(f'/data3/leics/dataset/rot_matrix/single_before_centered/{index}_{i}.obj')
+    gt_mesh = trimesh.load_mesh(f'/data3/leics/dataset/rot_matrix/single_after_centered/{index}_{i}.obj')
     before_mesh = trimesh.load_mesh(path)
-    predicted_mesh = transform_mesh(mesh,dof[i])
-    add = cal_add(predicted_mesh,before_mesh)
+    # predicted_mesh = transform_mesh(mesh,dof[i])
+    predicted_mesh.vertices = np.matmul(predicted_mesh.vertices,rot_matrix[i])
+    add = cal_add(predicted_mesh,gt_mesh)
     print(add)
     meshes.append(vedo.trimesh2vedo(predicted_mesh))
     before_meshes.append(vedo.trimesh2vedo(before_mesh))

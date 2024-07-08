@@ -39,6 +39,28 @@ def seed_torch(seed=12):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
 
+def robust_compute_rotation_matrix_from_ortho6d(poses):
+    """
+    Instead of making 2nd vector orthogonal to first
+    create a base that takes into account the two predicted
+    directions equally
+    """
+    x_raw = poses[:, 0:3]  # batch*3
+    y_raw = poses[:, 3:6]  # batch*3
+
+    x = torch.nn.functional.normalize(x_raw,dim=-1)  # batch*3
+    y = torch.nn.functional.normalize(y_raw,dim=-1)  # batch*3
+    middle = torch.nn.functional.normalize(x + y,dim=-1)
+    orthmid = torch.nn.functional.normalize(x - y,dim=-1)
+    x = torch.nn.functional.normalize(middle + orthmid,dim=-1)
+    y = torch.nn.functional.normalize(middle - orthmid,dim=-1)
+    z = torch.nn.functional.normalize(torch.cross(x, y, dim=-1),dim=-1)
+
+    x = x.view(-1, 3, 1)
+    y = y.view(-1, 3, 1)
+    z = z.view(-1, 3, 1)
+    matrix = torch.cat((x, y, z), 2)  # batch*3*3
+    return matrix
 # def transform_vertices(vertices,centroids,dofs):
 #     '''
 #     vertices: [bs, 32, pt_num, 3]
@@ -113,7 +135,6 @@ def transform_teeth(index,centers,RR):
     vedo.write(gt_mesh,f'/data3/leics/outputs/gt{index}.obj')
     exit()
 
-
 # def chamfer_loss(before_points,after_points,centroids,outputs):
 #     '''
 #     outputs: [bs,teeth_num,6]
@@ -132,15 +153,12 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, after_axis, before_axis, masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
         centers = center_patch.to(torch.float32).cuda()
         Fs = np_Fs.cuda()
-        after_axis = after_axis.to(torch.float32).cuda()
-        before_axis = before_axis.to(torch.float32).cuda()
-        axis = after_axis[:,:,:8]
         cordinates = coordinate_patch.to(torch.float32).cuda()
         before_points = before_points.to(torch.float32).cuda()
         after_points = after_points.to(torch.float32).cuda()
@@ -149,40 +167,21 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         masks = masks.cuda()
         n_samples += faces.shape[0]
         with torch.no_grad():
-            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, axis).to(torch.float32)
-            # centers = outputs[:,:,:3]
-            # print(masks[0][6])
-            # print(outputs[0][6])
-            # print(axis[0][6])
-            # criterion = nn.MSELoss(reduction='none')
-            # loss2 = criterion(axis[:,:,:3],outputs[:,:,:3]).sum(dim=-1)
-            # center_loss = (loss2 * masks).sum()
-
-            # criterion2 = nn.CosineEmbeddingLoss(reduction='none')
-            # bs = axis.shape[0]
-            # target = torch.ones(bs).cuda()
-            # axis_loss = torch.FloatTensor([0.]).to(device)
-            # for i in range(bs):
-            # normal1 = rearrange(outputs[:,:,3:6],'b n c -> (b n) c')
-            # gt_normal1 = rearrange(axis[:,:,3:6],'b n c -> (b n) c')
-            # normal2 = rearrange(outputs[:,:,6:],'b n c -> (b n) c')
-            # gt_normal2 = rearrange(axis[:,:,6:],'b n c -> (b n) c')
-            # target = torch.ones(32*bs).to(device)
-            # axis_loss = (criterion2(normal1,gt_normal1,target) + criterion2(normal2,gt_normal2,target))
-            # axis_loss = (axis_loss * masks.flatten()).sum()
-            # loss2 = centroid_loss(centroid, after_centroid, outputs)
-            # loss = chamfer_loss(before_points,after_points,outputs).mean()
-            # loss = center_loss + axis_loss
-            # print('loss:',loss)
-            predicted_centroid, gt_normal1, gt_normal2 = get_center_and_axis(outputs)
-            gt_normal1 = torch.nn.functional.normalize(gt_normal1,dim=-1)
-            gt_normal2 = torch.nn.functional.normalize(gt_normal2,dim=-1)
-            normal1 = before_axis[:,:,3:6]
-            normal2 = before_axis[:,:,6:]
-            RR = align_axis(normal1,normal2,gt_normal1,gt_normal2)
-            RR = rearrange(RR,'(b n) c1 c2 -> b n c1 c2', n=32)
+            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32)
+            predicted_centroid = outputs[:,:,:3]
+            dofs = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
+            criterion = nn.MSELoss(reduction='none')
+            rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
+            # predicted_points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
+            # predicted_points = torch.bmm(predicted_points,rot_matrix)
+            # predicted_points = predicted_points + rearrange(predicted_centroid,'b n c->(b n) c').unsqueeze(1)
+            # after_points = rearrange(after_points,'b n p c -> (b n) p c')
+            # loss = criterion(predicted_points,after_points).sum(dim=(1,2))
+            # loss = 0.001*(loss * masks.flatten()).sum()
+            # running_loss += loss.item() * faces.size(0)
+            rot_matrix = rearrange(rot_matrix,'(b n) c1 c2 -> b n c1 c2', n=32)
             for i in range(index.shape[0]):
-                transform_teeth(index[i],predicted_centroid[i],RR[i])
+                transform_teeth(index[i],predicted_centroid[i],rot_matrix[i])
 
 if __name__ == '__main__':
     # seed_torch(seed=43)
@@ -232,8 +231,8 @@ if __name__ == '__main__':
     # dataManager = OriginalFullTeethDataManager(dataroot,paramroot,args.train_ratio,)
     # train_dataset = dataManager.train_dataset()
     # test_dataset = dataManager.test_dataset()
-    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,2048)
-    test_dataset = FullTeethDataset(dataroot,paramroot,'val.txt',False,args,2048)
+    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,256)
+    test_dataset = FullTeethDataset(dataroot,paramroot,'special.txt',False,args,256)
     print(len(train_dataset))
     print(len(test_dataset))
     train_data_loader = data.DataLoader(train_dataset, num_workers=args.n_worker, batch_size=args.batch_size,

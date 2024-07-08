@@ -39,6 +39,29 @@ def seed_torch(seed=12):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
 
+def robust_compute_rotation_matrix_from_ortho6d(poses):
+    """
+    Instead of making 2nd vector orthogonal to first
+    create a base that takes into account the two predicted
+    directions equally
+    """
+    x_raw = poses[:, 0:3]  # batch*3
+    y_raw = poses[:, 3:6]  # batch*3
+
+    x = torch.nn.functional.normalize(x_raw,dim=-1)  # batch*3
+    y = torch.nn.functional.normalize(y_raw)  # batch*3
+    middle = torch.nn.functional.normalize(x + y)
+    orthmid = torch.nn.functional.normalize(x - y)
+    x = torch.nn.functional.normalize(middle + orthmid)
+    y = torch.nn.functional.normalize(middle - orthmid)
+    z = torch.nn.functional.normalize(torch.cross(x, y, dim=-1))
+
+    x = x.view(-1, 3, 1)
+    y = y.view(-1, 3, 1)
+    z = z.view(-1, 3, 1)
+    matrix = torch.cat((x, y, z), 2)  # batch*3*3
+    return matrix
+
 def transform_vertices(vertices,centroids,dofs):
     '''
     vertices: [bs, 32, pt_num, 3]
@@ -72,59 +95,6 @@ def chamfer_loss(before_points,after_points,outputs,masks=None):
         loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
     return loss/bs
 
-def rotation_matrix(vec1, vec2):
-    """ Find the rotation matrix that aligns vec1 to vec2
-    :param vec1: A 3d "source" vector
-    :param vec2: A 3d "destination" vector
-    :return mat: A transform matrix (3x3) which when applied to vec1, aligns it with vec2.
-    """
-    # a, b = (vec1 / np.linalg.norm(vec1)).reshape(3), (vec2 / np.linalg.norm(vec2)).reshape(3)
-
-
-    bs = vec1.shape[0]
-    a = nn.functional.normalize(vec1,dim=-1)
-    b = nn.functional.normalize(vec2,dim=-1)
-    n_vector = torch.cross(a, b, dim=-1)
-    c = torch.sum(a*b,dim=-1)
-    s = torch.norm(n_vector,dim=-1)
-    # s.masked_fill_(masks.flatten(),1)
-    n_matrix = torch.zeros(bs,3,3).cuda()
-    for i in range(bs):
-        n_matrix[i] = torch.tensor([[0, -n_vector[i,2], n_vector[i,1]],
-                             [n_vector[i,2], 0, -n_vector[i,0]],
-                             [-n_vector[i,1], n_vector[i,0], 0]], dtype=torch.float32)
-    I = torch.stack([torch.eye(3) for _ in range(bs)],dim=0).cuda()
-    rotation_matrix = I + n_matrix + ((torch.bmm(n_matrix,n_matrix) * ((1 - c.view(-1,1,1)) / (s.view(-1,1,1) ** 2))))
-    return rotation_matrix
-
-def rotation_matrix_with_axis(theta, v):
-    """
-    创建绕任意轴旋转的旋转矩阵
-    :param theta: 旋转角度（弧度）
-    :param v: 旋转轴的单位向量
-    :return: 旋转矩阵
-    """
-    bs = theta.shape[0]
-    K = torch.zeros(bs,3,3).cuda()
-    for i in range(bs):
-        K[i] = torch.tensor([[0, -v[i,2], v[i,1]],
-                        [v[i,2], 0, -v[i,0]],
-                        [-v[i,1], v[i,0], 0]]).cuda()
-    I = torch.stack([torch.eye(3) for _ in range(bs)],dim=0).cuda()
-    R = I + torch.sin(theta).view(-1,1,1) * K + (1 - torch.cos(theta).view(-1,1,1)) * torch.bmm(K, K)
-    return R
-
-def align_axis(normal1,normal2,gt_normal1,gt_normal2):
-    rot_matrix = rotation_matrix(gt_normal1.view(-1,3),normal1.view(-1,3)).transpose(2,1) #将z轴对齐
-
-    after_axis = torch.bmm(gt_normal2.view(-1,3).unsqueeze(1),rot_matrix)
-    rho = torch.cross(after_axis.squeeze(1), normal2.view(-1,3),dim=-1)
-    eps = 1e-7
-    theta = torch.acos(torch.clamp(torch.sum(normal2.view(-1,3)*after_axis.squeeze(1),dim=-1),min=-1+eps,max=1-eps)).cuda()
-    theta = -torch.sign(torch.sum(normal1.view(-1,3)*rho,dim=-1)) * theta
-    R = rotation_matrix_with_axis(theta,normal1.view(-1,3))
-    RR = torch.bmm(rot_matrix,R)
-    return RR
 
 def get_center_and_axis(x):
     '''
@@ -178,7 +148,7 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,after_axis,before_axis,masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,masks) in enumerate(
             train_dataset):
         optim.zero_grad()
         faces = face_patch.to(torch.float32).cuda()
@@ -188,9 +158,6 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         cordinates = coordinate_patch.cuda()
         centroid = centroid.to(torch.float32).cuda()
         after_centroid = after_centroid.to(torch.float32).cuda()
-        after_axis = after_axis.to(torch.float32).cuda()
-        axis = after_axis[:,:,:8]
-        before_axis = before_axis.to(torch.float32).cuda()
         masks = masks.cuda()
         n_samples += faces.shape[0]
         before_points = before_points.to(torch.float32).cuda()
@@ -198,37 +165,17 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         if args.use_mlp:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
         else:
-            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, axis).to(torch.float32).cuda()
+            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, None).to(torch.float32).cuda()
+        predicted_centroid = outputs[:,:,:3]
+        dofs = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
         criterion = nn.MSELoss(reduction='none')
-        loss2 = criterion(axis,outputs).sum(dim=-1)
-        center_loss = (loss2 * masks).sum()
-
-        # criterion2 = nn.CosineEmbeddingLoss(reduction='none')
-        # bs = axis.shape[0]
-        # target = torch.ones(bs).cuda()
-        # # axis_loss = torch.FloatTensor([0.]).to(device)
-        # # for i in range(bs):
-        # normal1 = rearrange(outputs[:,:,3:6],'b n c -> (b n) c')
-        # gt_normal1 = rearrange(axis[:,:,3:6],'b n c -> (b n) c')
-        # normal2 = rearrange(outputs[:,:,6:],'b n c -> (b n) c')
-        # gt_normal2 = rearrange(axis[:,:,6:],'b n c -> (b n) c')
-        # target = torch.ones(32*bs).to(device)
-        # axis_loss = (criterion2(normal1,gt_normal1,target) + criterion2(normal2,gt_normal2,target))
-        # axis_loss = (axis_loss * masks.flatten()).sum()
-        # loss2 = centroid_loss(centroid, after_centroid, outputs)
-        # loss = chamfer_loss(before_points,after_points,outputs).mean()
-        predicted_centroid, gt_normal1, gt_normal2 = get_center_and_axis(outputs)
-        gt_normal1 = torch.nn.functional.normalize(gt_normal1,dim=-1)
-        gt_normal2 = torch.nn.functional.normalize(gt_normal2,dim=-1)
-        normal1 = before_axis[:,:,3:6]
-        normal2 = before_axis[:,:,6:]
-        RR = align_axis(normal1,normal2,gt_normal1,gt_normal2)
-        add_loss = 0.1*cal_add_loss(before_points,after_points,RR,predicted_centroid,centroid,masks)
-        print('center_loss:',center_loss)
-        print('add_loss',add_loss)
-        loss = center_loss + add_loss
-        # print('centroid loss:',loss2)
-        # loss = loss2
+        rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
+        predicted_points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
+        predicted_points = torch.bmm(predicted_points,rot_matrix)
+        predicted_points = predicted_points + rearrange(predicted_centroid,'b n c->(b n) c').unsqueeze(1)
+        after_points = rearrange(after_points,'b n p c -> (b n) p c')
+        loss = criterion(predicted_points,after_points).sum(dim=(1,2))
+        loss = 0.001*(loss * masks.flatten()).sum()
         loss.backward()
         optim.step()
         running_loss += loss.item() * faces.size(0)
@@ -254,7 +201,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, after_axis,before_axis,masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
@@ -266,8 +213,6 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         centroid = centroid.to(torch.float32).cuda()
         after_centroid = after_centroid.to(torch.float32).cuda()
         # masks = (masks>0).cuda()
-        after_axis = after_axis.to(torch.float32).cuda()
-        axis = after_axis[:,:,:8]
         masks = masks.cuda()
         # trans_matrix = trans_matrix.to(torch.float32).cuda()
         n_samples += faces.shape[0]
@@ -279,25 +224,16 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
                 outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, axis).to(torch.float32).cuda()
             # loss = 512*chamfer_loss(before_points,after_points,centroid, outputs, masks)
             # loss = chamfer_loss(before_points,after_points,outputs/10, masks)
+            predicted_centroid = outputs[:,:,:3]
+            dofs = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
             criterion = nn.MSELoss(reduction='none')
-            loss2 = criterion(axis[:,:,:3],outputs[:,:,:3]).sum(dim=-1)
-            center_loss = (loss2 * masks).sum()
-
-            criterion2 = nn.CosineEmbeddingLoss(reduction='none')
-            bs = axis.shape[0]
-            target = torch.ones(bs).cuda()
-            # axis_loss = torch.FloatTensor([0.]).to(device)
-            # for i in range(bs):
-            normal1 = rearrange(outputs[:,:,3:6],'b n c -> (b n) c')
-            gt_normal1 = rearrange(axis[:,:,3:6],'b n c -> (b n) c')
-            normal2 = rearrange(outputs[:,:,6:],'b n c -> (b n) c')
-            gt_normal2 = rearrange(axis[:,:,6:],'b n c -> (b n) c')
-            target = torch.ones(32*bs).to(device)
-            axis_loss = (criterion2(normal1,gt_normal1,target) + criterion2(normal2,gt_normal2,target))
-            axis_loss = (axis_loss * masks.flatten()).sum()
-            # loss2 = centroid_loss(centroid, after_centroid, outputs)
-            # loss = chamfer_loss(before_points,after_points,outputs).mean()
-            loss = center_loss + axis_loss
+            rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
+            predicted_points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
+            predicted_points = torch.bmm(predicted_points,rot_matrix)
+            predicted_points = predicted_points + rearrange(predicted_centroid,'b n c->(b n) c').unsqueeze(1)
+            after_points = rearrange(after_points,'b n p c -> (b n) p c')
+            loss = criterion(predicted_points,after_points).sum(dim=(1,2))
+            loss = 0.001*(loss * masks.flatten()).sum()
             running_loss += loss.item() * faces.size(0)
             progress_bar(it, len(test_dataset), 'Test Loss: %.3f'% (running_loss/n_samples))
 
@@ -364,8 +300,8 @@ if __name__ == '__main__':
     # dataManager = FullTeethDataManager(dataroot,paramroot,args.train_ratio,)
     # train_dataset = dataManager.train_dataset()
     # test_dataset = dataManager.test_dataset()
-    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,2048)
-    test_dataset = FullTeethDataset(dataroot,paramroot,'val.txt',False,args,2048)
+    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,256)
+    test_dataset = FullTeethDataset(dataroot,paramroot,'val.txt',False,args,256)
     print(len(train_dataset))
     print(len(test_dataset))
     train_data_loader = data.DataLoader(train_dataset, num_workers=args.n_worker, batch_size=args.batch_size,
