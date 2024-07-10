@@ -127,7 +127,7 @@ class Block(nn.Module):
 class PatchEmbed(nn.Module):
     """ Image to Patch Embedding
     """
-    def __init__(self, patch_size=2, in_chans=8, embed_dim=768):
+    def __init__(self, patch_size=2, in_chans=9, embed_dim=768):
         super().__init__()
         self.patch_size = patch_size
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
@@ -137,9 +137,28 @@ class PatchEmbed(nn.Module):
         x = self.proj(x).flatten(2).transpose(1, 2)
         return x
 
+def pre_handle(poses):
+    """
+    Instead of making 2nd vector orthogonal to first
+    create a base that takes into account the two predicted
+    directions equally
+    """
+    x_raw = poses[:, 0:3]  # batch*3
+    y_raw = poses[:, 3:6]  # batch*3
+
+    x = torch.nn.functional.normalize(x_raw,dim=-1)  # batch*3
+    y = torch.nn.functional.normalize(y_raw)  # batch*3
+    middle = torch.nn.functional.normalize(x + y)
+    orthmid = torch.nn.functional.normalize(x - y)
+    x = torch.nn.functional.normalize(middle + orthmid)
+    y = torch.nn.functional.normalize(middle - orthmid)
+    
+    matrix = torch.cat((x, y), 1)  # batch*3*3
+    return matrix
+
 
 class UViT(nn.Module):
-    def __init__(self, img_size=224, patch_size=2, in_chans=8, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4.,
+    def __init__(self, img_size=224, patch_size=2, in_chans=9, embed_dim=768, depth=24, num_heads=12, mlp_ratio=4.,
                  qkv_bias=False, qk_scale=None, norm_layer=nn.LayerNorm, mlp_time_embed=False, num_classes=-1,
                  use_checkpoint=False, conv=False, skip=True):
         super().__init__()
@@ -189,7 +208,14 @@ class UViT(nn.Module):
         self.norm = norm_layer(embed_dim)
         self.patch_dim = patch_size ** 2 * in_chans
         self.decoder_pred = nn.Linear(embed_dim, self.patch_dim, bias=True)
-        self.final_layer = nn.Conv2d(self.in_chans, self.in_chans, 3, padding=1) if conv else nn.Identity()
+        # self.final_layer = nn.Sequential(
+        #     nn.Linear(32*in_chans, 32*in_chans),
+        #     nn.GELU(),
+        #     nn.Linear(32*in_chans, 32*in_chans),
+        #     nn.GELU(),
+        #     nn.Linear(32*in_chans, 32*in_chans),
+        # )
+        self.final_layer = nn.Identity()
 
         trunc_normal_(self.pos_embed, std=.02)
         self.apply(self._init_weights)
@@ -237,8 +263,13 @@ class UViT(nn.Module):
         assert x.size(1) == self.extras + L
         x = x[:, self.extras:, :]
         x = unpatchify(x, self.in_chans)
-        x = einops.rearrange(x,'b c w h -> b (w h) c')
+        x = einops.rearrange(x,'b c w h -> (b w h) c')
+        x[:,3:] = pre_handle(x[:,3:].clone())
+        x = einops.rearrange(x,'(b n) c -> b n c',n=32)
         x = self.final_layer(x)
+        # x = self.final_layer(x)
+        # x = einops.rearrange(x,'b (n c) -> (b n) c',n=32)
+        # x = einops.rearrange(x,'b c w h -> b (w h) c')
         return x
 
 if __name__ == '__main__':

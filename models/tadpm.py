@@ -83,7 +83,7 @@ class TADPM(nn.Module):
             if isinstance(layer, nn.Linear):
                 # 使用 Xavier 初始化
                 nn.init.xavier_uniform_(layer.weight)
-                nn.init.zeros_(layer.bias)
+                # nn.init.zeros_(layer.bias)
             if isinstance(layer, nn.Conv2d):
                 # 使用 Xavier 初始化
                 nn.init.xavier_uniform_(layer.weight)
@@ -120,3 +120,4 @@ class TADPM(nn.Module):
             dofs = self.regressor(gt_6dof,embedding)
         return dofs
 
+ 

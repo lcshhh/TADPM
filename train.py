@@ -62,6 +62,25 @@ def robust_compute_rotation_matrix_from_ortho6d(poses):
     matrix = torch.cat((x, y, z), 2)  # batch*3*3
     return matrix
 
+def robust_compute_rotation_matrix_for_diffusion(poses,test=False):
+    """
+    Instead of making 2nd vector orthogonal to first
+    create a base that takes into account the two predicted
+    directions equally
+    """
+    x = poses[:, 0:3]  # batch*3
+    y = poses[:, 3:6]  # batch*3
+    y_copy = y.clone()
+    if test:
+        y[:,2] = -(x[:,0] * y_copy[:,0] + x[:,1] * y_copy[:,1])/x[:,2]
+
+    z = torch.nn.functional.normalize(torch.cross(x, y, dim=-1))
+    x = x.view(-1, 3, 1)
+    y = y.view(-1, 3, 1)
+    z = z.view(-1, 3, 1)
+    matrix = torch.cat((x, y, z), 2)  # batch*3*3
+    return matrix
+
 def transform_vertices(vertices,centroids,dofs):
     '''
     vertices: [bs, 32, pt_num, 3]
@@ -95,7 +114,7 @@ def chamfer_loss(before_points,after_points,outputs,masks=None):
         loss,_ = chamfer_distance(after_points, riged_tar, point_reduction="sum", norm=1)
     return loss/bs
 
-
+ 
 def get_center_and_axis(x):
     '''
     x:[bs,32,8]
@@ -148,12 +167,13 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,gt_params,masks) in enumerate(
             train_dataset):
         optim.zero_grad()
         faces = face_patch.to(torch.float32).cuda()
         feats = feats_patch.to(torch.float32).cuda()
         centers = center_patch.to(torch.float32).cuda()
+        gt_params = gt_params.to(torch.float32).cuda()
         Fs = np_Fs.cuda()
         cordinates = coordinate_patch.cuda()
         centroid = centroid.to(torch.float32).cuda()
@@ -165,17 +185,24 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         if args.use_mlp:
             outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
         else:
-            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, None).to(torch.float32).cuda()
+            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
         predicted_centroid = outputs[:,:,:3]
         dofs = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
         criterion = nn.MSELoss(reduction='none')
-        rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
+        if args.use_mlp:
+            rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
+        else:
+            rot_matrix = robust_compute_rotation_matrix_for_diffusion(dofs)
         predicted_points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
         predicted_points = torch.bmm(predicted_points,rot_matrix)
         predicted_points = predicted_points + rearrange(predicted_centroid,'b n c->(b n) c').unsqueeze(1)
         after_points = rearrange(after_points,'b n p c -> (b n) p c')
         loss = criterion(predicted_points,after_points).sum(dim=(1,2))
         loss = 0.001*(loss * masks.flatten()).sum()
+        # loss2 = 0.03*((criterion(outputs,gt_params).sum(dim=-1)) * masks).sum()
+        # print('loss1:',loss)
+        # print('loss2',loss2)
+        # loss = loss + loss2
         loss.backward()
         optim.step()
         running_loss += loss.item() * faces.size(0)
@@ -201,11 +228,12 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,gt_params,masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
         centers = center_patch.to(torch.float32).cuda()
+        gt_params = gt_params.to(torch.float32).cuda()
         Fs = np_Fs.cuda()
         cordinates = coordinate_patch.to(torch.float32).cuda()
         before_points = before_points.to(torch.float32).cuda()
@@ -221,19 +249,26 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
             if args.use_mlp:
                 outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
             else:
-                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, axis).to(torch.float32).cuda()
+                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
             # loss = 512*chamfer_loss(before_points,after_points,centroid, outputs, masks)
             # loss = chamfer_loss(before_points,after_points,outputs/10, masks)
             predicted_centroid = outputs[:,:,:3]
             dofs = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
             criterion = nn.MSELoss(reduction='none')
-            rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
+            if args.use_mlp:
+                rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
+            else:
+                rot_matrix = robust_compute_rotation_matrix_for_diffusion(dofs,True)
             predicted_points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
             predicted_points = torch.bmm(predicted_points,rot_matrix)
             predicted_points = predicted_points + rearrange(predicted_centroid,'b n c->(b n) c').unsqueeze(1)
             after_points = rearrange(after_points,'b n p c -> (b n) p c')
             loss = criterion(predicted_points,after_points).sum(dim=(1,2))
             loss = 0.001*(loss * masks.flatten()).sum()
+            # loss2 = ((criterion(outputs,gt_params).sum(dim=-1)) * masks).sum()
+            # print('loss1:',loss)
+            # print('loss2',loss2)
+            # loss = loss + loss2
             running_loss += loss.item() * faces.size(0)
             progress_bar(it, len(test_dataset), 'Test Loss: %.3f'% (running_loss/n_samples))
 

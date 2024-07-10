@@ -1,13 +1,12 @@
 python train.py train \
 	--encoder_checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
-	--checkpoint "/data3/leics/checkpoints/rot/rot1e-4/best_acc.pkl" \
 	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
 	--before_path "/data3/leics/dataset/mesh/single_pointcloud_before256" \
 	--after_path "/data3/leics/dataset/mesh/single_pointcloud_after256" \
 	--paramroot "/data3/leics/dataset/mesh/single_after_axis_revert" \
-	--batch_size 16 --n_classes 40 \
+	--batch_size 28 --n_classes 40 \
 	--n_epoch 700 \
-	--name "rot2_1e-4" \
+	--name "diffusion_complex3_1e-4" \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \
@@ -25,4 +24,3 @@ python train.py train \
 	--use_pointnet \
 	--lower \
 	--saveroot "/data3/leics/checkpoints/rot" \
-	--use_mlp

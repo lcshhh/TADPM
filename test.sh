@@ -1,6 +1,6 @@
 python test.py \
 	--encoder_checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
-	--checkpoint "/data3/leics/checkpoints/rot/rot2_1e-4/best_acc.pkl" \
+	--checkpoint "/data3/leics/checkpoints/rot/diffusion1e-5/best_acc.pkl" \
 	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
 	--before_path "/data3/leics/dataset/mesh/single_pointcloud_before256" \
 	--after_path "/data3/leics/dataset/mesh/single_pointcloud_after256" \
@@ -24,4 +24,4 @@ python test.py \
 	--dim 768 \
 	--use_pointnet \
 	--lower \
-	--use_mlp
+	--use_mlp \

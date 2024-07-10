@@ -74,7 +74,7 @@ def robust_compute_rotation_matrix_from_ortho6d(poses):
 #     vertices = rearrange(vertices,'b n pn c -> (b n) pn c')
 #     vertices = torch.bmm(vertices - centroids,R) + centroids + move
 #     return vertices
-from train import align_axis, get_center_and_axis
+# from train import align_axis, get_center_and_axis
 # def transform_mesh(mesh,centroid,dof):
 #     '''
 #     vertices: [pt_num, 3]
@@ -135,6 +135,26 @@ def transform_teeth(index,centers,RR):
     vedo.write(gt_mesh,f'/data3/leics/outputs/gt{index}.obj')
     exit()
 
+def robust_compute_rotation_matrix_for_diffusion(poses,test=False):
+    """
+    Instead of making 2nd vector orthogonal to first
+    create a base that takes into account the two predicted
+    directions equally
+    """
+    x = poses[:, 0:3]  # batch*3
+    y = poses[:, 3:6]  # batch*3
+    y_copy = y.clone()
+    if test:
+        print(torch.cross(x,y))
+        y[:,2] = -(x[:,0] * y_copy[:,0] + x[:,1] * y_copy[:,1])/x[:,2]
+
+    z = torch.nn.functional.normalize(torch.cross(x, y, dim=-1))
+    x = x.view(-1, 3, 1)
+    y = y.view(-1, 3, 1)
+    z = z.view(-1, 3, 1)
+    matrix = torch.cat((x, y, z), 2)  # batch*3*3
+    return matrix
+
 # def chamfer_loss(before_points,after_points,centroids,outputs):
 #     '''
 #     outputs: [bs,teeth_num,6]
@@ -153,7 +173,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,gt_params, masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
@@ -167,11 +187,17 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         masks = masks.cuda()
         n_samples += faces.shape[0]
         with torch.no_grad():
-            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32)
+            if args.use_mlp:
+                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
+            else:
+                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
             predicted_centroid = outputs[:,:,:3]
             dofs = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
             criterion = nn.MSELoss(reduction='none')
-            rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
+            if args.use_mlp:
+                rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
+            else:
+                rot_matrix = robust_compute_rotation_matrix_for_diffusion(dofs,True)
             # predicted_points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
             # predicted_points = torch.bmm(predicted_points,rot_matrix)
             # predicted_points = predicted_points + rearrange(predicted_centroid,'b n c->(b n) c').unsqueeze(1)

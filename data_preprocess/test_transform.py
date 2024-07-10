@@ -70,6 +70,10 @@ def merge_mesh(index):
 def cal_add(mesh1,mesh2):
     add = torch.square(torch.FloatTensor(mesh1.vertices - mesh2.vertices)).sum()
     return add
+# def cal_add(mesh1,mesh2):
+#     # add = torch.square(torch.FloatTensor(mesh1.vertices - mesh2.vertices)).sum()
+#     add, _ = chamfer_distance(torch.from_numpy(mesh1.vertices).unsqueeze(0).to(torch.float32),torch.from_numpy(mesh2.vertices).unsqueeze(0).to(torch.float32))
+#     return add
 
 # paramroot = '/data3/leics/dataset/created/params'
 
@@ -100,7 +104,7 @@ def cal_add(mesh1,mesh2):
 # merge_mesh(177)
 
 paramroot = '/data3/leics/dataset/rot_matrix/param'
-index = 292
+index = 1014
 rot_matrix = torch.load(os.path.join(paramroot,f'{index}.pkl')).float()
 meshes = []
 before_meshes = []
@@ -113,18 +117,24 @@ for i in range(32):
     predicted_mesh = trimesh.load_mesh(f'/data3/leics/dataset/rot_matrix/single_before_centered/{index}_{i}.obj')
     gt_mesh = trimesh.load_mesh(f'/data3/leics/dataset/rot_matrix/single_after_centered/{index}_{i}.obj')
     before_mesh = trimesh.load_mesh(path)
-    predicted_mesh = transform_mesh(mesh,rot_matrix[i])
-    # predicted_mesh.vertices = torch.mm(torch.from_numpy(predicted_mesh.vertices).to(torch.float32),rot_matrix[i].transpose(0,1))
+    # predicted_mesh.vertices = transform_mesh(mesh,rot_matrix[i])
+    mesh2 = trimesh.load_mesh(f'/data3/leics/dataset/mesh/single_after/{index}_{i}.obj')
+    predicted_mesh.vertices = torch.mm(torch.from_numpy(predicted_mesh.vertices).to(torch.float32),rot_matrix[i]) + mesh2.centroid
     add = cal_add(predicted_mesh,gt_mesh)
-    print(add)
+    # print(add)
+    print(np.dot(rot_matrix[i][0],rot_matrix[i][1]))
+    exit()
     meshes.append(vedo.trimesh2vedo(predicted_mesh))
     before_meshes.append(vedo.trimesh2vedo(before_mesh))
     gt_meshes.append(vedo.trimesh2vedo(gt_mesh))
 
     # before_mesh = vedo.merge(before_meshes)
-    vedo.write(vedo.trimesh2vedo(before_mesh),f'/data3/leics/dataset/mesh/before{index}_{i}.obj')
-    # after_mesh = vedo.merge(meshes)
-    vedo.write(vedo.trimesh2vedo(predicted_mesh),f'/data3/leics/dataset/mesh/after{index}_{i}.obj')
-    # before_mesh = vedo.merge(before_meshes)
-    vedo.write(vedo.trimesh2vedo(gt_mesh),f'/data3/leics/dataset/mesh/gt{index}_{i}.obj')
+    # vedo.write(vedo.trimesh2vedo(before_mesh),f'/data3/leics/dataset/mesh/before{index}_{i}.obj')
+    # # after_mesh = vedo.merge(meshes)
+    # vedo.write(vedo.trimesh2vedo(predicted_mesh),f'/data3/leics/dataset/mesh/after{index}_{i}.obj')
+    # # before_mesh = vedo.merge(before_meshes)
+    # vedo.write(vedo.trimesh2vedo(gt_mesh),f'/data3/leics/dataset/mesh/gt{index}_{i}.obj')
+mesh = vedo.merge(meshes)
+vedo.write(mesh,'/data3/leics/test.obj')
+
     
