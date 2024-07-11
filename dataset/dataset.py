@@ -26,7 +26,7 @@ def  randomize_mesh_orientation2(mesh: trimesh.Trimesh):
     rotation = Rotation.from_euler(axis_seq, angles, degrees=True)
     translation = np.array([random.uniform(-0.04,0.04),random.uniform(-0.04,0.04),random.uniform(-0.01,0.01)])
     centroid = mesh.centroid
-    mesh1.vertices = rotation.apply(mesh1.vertices - centroid) + centroid
+    mesh1.vertices = rotation.apply(mesh1.vertices - centroid) + centroid + translation
     return mesh1, rotation, translation
 
 def read_pointcloud(path):
@@ -247,10 +247,11 @@ class FullTeethDataset(data.Dataset):
                 centroid[i] = before[point_num]
                 after = read_pointcloud(after_path)
                 after_points[i] = after[:point_num]
-                after_centroid[i] = after[point_num]
+                after_centroid[i] = after[point_num] 
                 if self.train and np.random.rand() < 0.3:
                     mesh, rotation, translation = randomize_mesh_orientation2(mesh)
-                    before_points[i] = rotation.apply(before_points[i] - np.expand_dims(centroid[i],0)) + np.expand_dims(centroid[i],0)
+                    before_points[i] = rotation.apply(before_points[i] - np.expand_dims(centroid[i],0)) + np.expand_dims(centroid[i] + translation,0)
+                    centroid[i] = centroid[i] + translation
                     matrix[i] = np.matmul(rotation.as_matrix(),matrix[i])
 
                 feats[i], center[i], cordinates[i], faces[i], Fs[i]= load_mesh_shape(mesh, 
@@ -263,4 +264,50 @@ class FullTeethDataset(data.Dataset):
 
     def __len__(self):
         return len(self.indexes)
+
+class FullTeethTestDataset(data.Dataset):
+    def __init__(self, dataroot, paramroot, file_name, train, args, npoint):
+        super().__init__()
+        self.feats = ['area', 'face_angles', 'curvs', 'normal']
+        self.dataroot = dataroot
+        self.paramroot = paramroot
+        self.before_path = args.before_path
+        self.after_path = args.after_path
+        self.npoint = npoint
+        with open(file_name) as f:
+            self.indexes = [int(i.strip()) for i in f.readlines()]
+        self.train = train
+    
+    def __getitem__(self, idx):
+        point_num = self.npoint
+        feats = np.zeros((32,10,256,64))
+        center = np.zeros((32,256,64,3))
+        cordinates = np.zeros((32,256,64,9))
+        faces = np.zeros((32,256,64,3))
+        Fs = np.zeros(32)
+        before_points = np.zeros((32,point_num,3))
+        after_points = np.zeros((32,point_num,3))
+        centroid = np.zeros((32,3))
+        after_centroid = np.zeros((32,3))
+        index = self.indexes[idx]
+        masks = np.zeros((32),dtype=np.int32)
+        for i in range(32):
+            obj_path = os.path.join(self.dataroot,f'{index}_{i}.obj')
+            before_path = os.path.join(self.before_path,f'{index}_{i}.ply')
+            if os.path.exists(obj_path) and os.path.exists(before_path):
+                mesh = trimesh.load_mesh(obj_path, process=False)
+                masks[i] = 1
+                before = read_pointcloud(before_path)
+                before_points[i] = before[:point_num]
+                centroid[i] = before[point_num]
+
+                feats[i], center[i], cordinates[i], faces[i], Fs[i]= load_mesh_shape(mesh, 
+                                                                    request=self.feats)
+        return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,masks
+        # return   feats,center,cordinates,faces,Fs,index,before_points,after_points,centroid,after_centroid,before_points_centered
+
+
+    def __len__(self):
+        return len(self.indexes)
+
 

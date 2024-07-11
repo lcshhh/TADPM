@@ -26,7 +26,7 @@ from scipy.spatial.transform import Rotation
 from einops import rearrange
 from pytorch3d.transforms import se3_exp_map,se3_log_map
 from pytorch3d.transforms import euler_angles_to_matrix
-from dataset.dataset import FullTeethDataset
+from dataset.dataset import FullTeethDataset, FullTeethTestDataset
 from models.tadpm import TADPM
 from util import progress_bar
 from models.utils import compute_rotation_matrix_from_ortho6d
@@ -61,6 +61,55 @@ def robust_compute_rotation_matrix_from_ortho6d(poses):
     z = z.view(-1, 3, 1)
     matrix = torch.cat((x, y, z), 2)  # batch*3*3
     return matrix
+
+def rearrangee(npary: np.ndarray)->np.ndarray:
+    """
+    Rearrange the oder of the label of the input numpy array.
+    :param npary: Input numpy array.
+    :return:
+    """
+    npary[npary == 24] = 41
+    npary[npary == 23] = 42
+    npary[npary == 22] = 43
+    npary[npary == 21] = 44
+    npary[npary == 20] = 45
+    npary[npary == 19] = 46
+    npary[npary == 18] = 47
+    npary[npary == 17] = 48
+
+    npary[npary == 31] = 37
+    npary[npary == 32] = 38
+    npary[npary == 25] = 31
+    npary[npary == 26] = 32
+    npary[npary == 27] = 33
+    npary[npary == 28] = 34
+    npary[npary == 29] = 35
+    npary[npary == 30] = 36
+
+    npary[npary == 9] = 21
+    npary[npary == 10] = 22
+    npary[npary == 11] = 23
+    npary[npary == 12] = 24
+    npary[npary == 13] = 25
+    npary[npary == 14] = 26
+    npary[npary == 15] = 27
+    npary[npary == 16] = 28
+
+    npary[npary == 1] = 18
+    npary[npary == 2] = 17
+    npary[npary == 3] = 16
+    npary[npary == 4] = 15
+    npary[npary == 5] = 14
+    npary[npary == 6] = 13
+    npary[npary == 7] = 12
+    npary[npary == 8] = 11
+    return npary
+
+def rearrange_index(index):
+    a = np.array(index+1)
+    b = rearrangee(a)
+    return b
+
 # def transform_vertices(vertices,centroids,dofs):
 #     '''
 #     vertices: [bs, 32, pt_num, 3]
@@ -112,12 +161,37 @@ def transform_teeth(index,centers,RR):
     before_meshes = []
     meshes = []
     gt_meshes = []
+    fdis = []
+    # for i in range(32):
+    #     path = os.path.join('/data3/leics/dataset/mesh/single_before',f'{index}_{i}.obj')
+    #     gt_path = os.path.join('/data3/leics/dataset/mesh/single_after',f'{index}_{i}.obj')
+    #     if os.path.exists(path) and os.path.exists(gt_path):
+    #         mesh = trimesh.load_mesh(path)
+    #         gt_mesh = vedo.Mesh(gt_path)
+    #         before_mesh = trimesh.load_mesh(path)
+    #         before_meshes.append(vedo.trimesh2vedo(before_mesh))
+    #         mesh.vertices = np.matmul((mesh.vertices - mesh.centroid),RR[i].cpu().numpy()) + centers[i].cpu().numpy()
+    #         meshes.append(vedo.trimesh2vedo(mesh))
+    #         gt_meshes.append(gt_mesh)
+    #         fdis.append(i)
+    # mesh = vedo.merge(meshes)
+    # before_mesh = vedo.merge(before_meshes)
+    # gt_mesh = vedo.merge(gt_meshes)
+    # os.makedirs('/data3/leics/outputs',exist_ok=True)
+    # vedo.write(mesh,f'/data3/leics/outputs/after{index}.obj')
+    # vedo.write(before_mesh,f'/data3/leics/outputs/before{index}.obj')
+    # vedo.write(gt_mesh,f'/data3/leics/outputs/gt{index}.obj')
+    # os.makedirs('/data3/leics/output2s',exist_ok=True)
+    # os.makedirs(f'/data3/leics/output2s/{index-1082}',exist_ok=True)
+    # centroid = vedo.vedo2trimesh(mesh).centroid
+    # for i in range(len(fdis)):
+    #     tmp_mesh = meshes[i]
+    #     tmp_mesh.vertices = (tmp_mesh.vertices - centroid) * 40
+    #     meshes[i].export(f'/data3/leics/output2s/{index-1082}/{rearrange_index(i)}')
     for i in range(32):
         path = os.path.join('/data3/leics/dataset/mesh/single_before',f'{index}_{i}.obj')
-        gt_path = os.path.join('/data3/leics/dataset/mesh/single_after',f'{index}_{i}.obj')
-        if os.path.exists(path) and os.path.exists(gt_path):
+        if os.path.exists(path):
             mesh = trimesh.load_mesh(path)
-            gt_mesh = vedo.Mesh(gt_path)
             before_mesh = trimesh.load_mesh(path)
             before_meshes.append(vedo.trimesh2vedo(before_mesh))
             # after_mesh = move_mesh(mesh,centroid[i],output[i])
@@ -125,15 +199,18 @@ def transform_teeth(index,centers,RR):
             # mesh.vertices = mesh.vertices - mesh.centroid + centers[i].cpu().numpy()
             mesh.vertices = np.matmul((mesh.vertices - mesh.centroid),RR[i].cpu().numpy()) + centers[i].cpu().numpy()
             meshes.append(vedo.trimesh2vedo(mesh))
-            gt_meshes.append(gt_mesh)
+            fdis.append(i)
     mesh = vedo.merge(meshes)
     before_mesh = vedo.merge(before_meshes)
-    gt_mesh = vedo.merge(gt_meshes)
-    os.makedirs('/data3/leics/outputs',exist_ok=True)
-    vedo.write(mesh,f'/data3/leics/outputs/after{index}.obj')
-    vedo.write(before_mesh,f'/data3/leics/outputs/before{index}.obj')
-    vedo.write(gt_mesh,f'/data3/leics/outputs/gt{index}.obj')
-    exit()
+    os.makedirs('/data3/leics/output2s',exist_ok=True)
+    os.makedirs(f'/data3/leics/output2s/{index-1082}',exist_ok=True)
+    centroid = vedo.vedo2trimesh(mesh).centroid
+    for i in range(len(fdis)):
+        tmp_mesh = vedo.vedo2trimesh(meshes[i])
+        tmp_mesh.vertices = (tmp_mesh.vertices - centroid) * 40
+        tmp_mesh.export(f'/data3/leics/output2s/{index-1082}/{rearrange_index(fdis[i])}.stl')
+    # vedo.write(mesh,f'/data3/leics/outputs_test/after{index}.obj')
+    # vedo.write(before_mesh,f'/data3/leics/outputs_test/before{index}.obj')
 
 def robust_compute_rotation_matrix_for_diffusion(poses,test=False):
     """
@@ -173,7 +250,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
     running_loss = 0
     n_samples = 0
 
-    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid,gt_params, masks) in enumerate(
+    for it, (feats_patch, center_patch, coordinate_patch, face_patch, np_Fs, index, before_points, after_points, centroid,after_centroid, masks) in enumerate(
             test_dataset):
         faces = face_patch.cuda()
         feats = feats_patch.to(torch.float32).cuda()
@@ -190,7 +267,7 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
             if args.use_mlp:
                 outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
             else:
-                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
+                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
             predicted_centroid = outputs[:,:,:3]
             dofs = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
             criterion = nn.MSELoss(reduction='none')
@@ -257,8 +334,8 @@ if __name__ == '__main__':
     # dataManager = OriginalFullTeethDataManager(dataroot,paramroot,args.train_ratio,)
     # train_dataset = dataManager.train_dataset()
     # test_dataset = dataManager.test_dataset()
-    train_dataset = FullTeethDataset(dataroot,paramroot,'train.txt',True,args,256)
-    test_dataset = FullTeethDataset(dataroot,paramroot,'special.txt',False,args,256)
+    train_dataset = FullTeethTestDataset(dataroot,paramroot,'train.txt',True,args,256)
+    test_dataset = FullTeethTestDataset(dataroot,paramroot,'test.txt',False,args,256)
     print(len(train_dataset))
     print(len(test_dataset))
     train_data_loader = data.DataLoader(train_dataset, num_workers=args.n_worker, batch_size=args.batch_size,

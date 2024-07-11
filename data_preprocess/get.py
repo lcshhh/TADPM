@@ -54,6 +54,7 @@ val_path = Path('/data/lcs/dataset/mesh/scan_eval')
 test_path = Path('/data/lcs/dataset/mesh/scan_test')
 out_path = Path('/data/lcs/dataset/mesh/single')
 os.makedirs(out_path,exist_ok=True)
+map_lst = {}
 train_list = []
 for path in train_path.iterdir():
     for stl_path in path.iterdir():
@@ -62,13 +63,15 @@ for path in val_path.iterdir():
     for stl_path in path.iterdir():
         train_list.append(stl_path)
 for path in test_path.iterdir():
+    print(path)
+    exit()
     for stl_path in path.iterdir():
         train_list.append(stl_path)
 # with open('single.txt','w') as f:
 #     for path in train_list:
 #         f.write(str(path)+'\n')
-for i,path in enumerate(train_list):
-    mesh = trimesh.load_mesh(path)
-    mesh.vertices = mesh.vertices / 40
-    mesh.export(os.path.join(out_path,f'{i}.obj'))
+# for i,path in enumerate(train_list):
+#     mesh = trimesh.load_mesh(path)
+#     mesh.vertices = mesh.vertices / 40
+#     mesh.export(os.path.join(out_path,f'{i}.obj'))
 
