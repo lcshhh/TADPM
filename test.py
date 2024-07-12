@@ -334,7 +334,7 @@ if __name__ == '__main__':
     # train_dataset = dataManager.train_dataset()
     # test_dataset = dataManager.test_dataset()
     train_dataset = FullTeethTestDataset(dataroot,paramroot,'train.txt',True,args,256)
-    test_dataset = FullTeethTestDataset(dataroot,paramroot,'valid.txt',False,args,256)
+    test_dataset = FullTeethTestDataset(dataroot,paramroot,'special.txt',False,args,256)
     print(len(train_dataset))
     print(len(test_dataset))
     train_data_loader = data.DataLoader(train_dataset, num_workers=args.n_worker, batch_size=args.batch_size,
