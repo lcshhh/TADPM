@@ -248,11 +248,11 @@ class FullTeethDataset(data.Dataset):
                 after = read_pointcloud(after_path)
                 after_points[i] = after[:point_num]
                 after_centroid[i] = after[point_num] 
-                if self.train and np.random.rand() < 0.3:
-                    mesh, rotation, translation = randomize_mesh_orientation2(mesh)
-                    before_points[i] = rotation.apply(before_points[i] - np.expand_dims(centroid[i],0)) + np.expand_dims(centroid[i] + translation,0)
-                    centroid[i] = centroid[i] + translation
-                    matrix[i] = np.matmul(rotation.as_matrix(),matrix[i])
+                # if self.train and np.random.rand() < 0.3:
+                #     mesh, rotation, translation = randomize_mesh_orientation2(mesh)
+                #     before_points[i] = rotation.apply(before_points[i] - np.expand_dims(centroid[i],0)) + np.expand_dims(centroid[i] + translation,0)
+                #     centroid[i] = centroid[i] + translation
+                #     matrix[i] = np.matmul(rotation.as_matrix(),matrix[i])
 
                 feats[i], center[i], cordinates[i], faces[i], Fs[i]= load_mesh_shape(mesh, 
                                                                     request=self.feats)

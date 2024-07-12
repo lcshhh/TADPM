@@ -56,33 +56,33 @@ def get_pointcloud_with_center(before_outputroot,after_outputroot,after_dataroot
     pcd.points = o3d.utility.Vector3dVector(points)
     o3d.io.write_point_cloud(os.path.join(before_outputroot,new_name), pcd)
     
-    # after_mesh = trimesh.load_mesh(os.path.join(after_dataroot,obj.name))
-    # if os.path.exists(os.path.join(after_outputroot,new_name)):
-    #      return
-    # points = np.array(after_mesh.vertices)
-    # points = points[centroids.astype(np.int32)]
-    # points = np.concatenate([points,torch.tensor(after_mesh.centroid).unsqueeze(0).numpy()],axis=0)
-    # pcd = o3d.geometry.PointCloud()
-    # pcd.points = o3d.utility.Vector3dVector(points)
-    # o3d.io.write_point_cloud(os.path.join(after_outputroot,new_name), pcd)
+    after_mesh = trimesh.load_mesh(os.path.join(after_dataroot,obj.name))
+    if os.path.exists(os.path.join(after_outputroot,new_name)):
+         return
+    points = np.array(after_mesh.vertices)
+    points = points[centroids.astype(np.int32)]
+    points = np.concatenate([points,torch.tensor(after_mesh.centroid).unsqueeze(0).numpy()],axis=0)
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    o3d.io.write_point_cloud(os.path.join(after_outputroot,new_name), pcd)
 
 def read_pointcloud():
     pcd = o3d.io.read_point_cloud("/data/lcs/dataset/teeth_full/pointcloud_after512/0_19.ply")
     xyz = np.asarray(pcd.points)
     return xyz
 
-before_dataroot = Path('/data3/leics/dataset/mesh/single_before')
-after_dataroot = Path('/data3/leics/dataset/mesh/single_after')
-before_outputroot = '/data3/leics/dataset/mesh/single_pointcloud_before256'   #
-after_outputroot = '/data3/leics/dataset/mesh/single_pointcloud_after256'   #
+before_dataroot = Path('/data/lcs/dataset/teeth_full/single_normed_before')
+after_dataroot = Path('/data/lcs/dataset/teeth_full/single_normed_after')
+before_outputroot = '/data3/leics/dataset/teeth_full/single_pointcloud_before256'   #
+after_outputroot = '/data3/leics/dataset/teeth_full/single_pointcloud_after256'   #
 # with open('valid.txt') as f:
 #      indexes = [int(i.strip()) for i in f.readlines()]
 os.makedirs(before_outputroot,exist_ok=True)
 os.makedirs(after_outputroot,exist_ok=True)
 pool = Pool(processes=32)
 for obj in before_dataroot.iterdir():
-    #  if not os.path.exists(os.path.join(after_dataroot,obj.name)):
-    #       continue
+     if not os.path.exists(os.path.join(after_dataroot,obj.name)):
+          continue
      pool.apply_async(
           get_pointcloud_with_center,
           (before_outputroot,after_outputroot,after_dataroot,obj)

@@ -1,9 +1,9 @@
 python test.py \
 	--encoder_checkpoint "/data/lcs/checkpoints/mesh/single_no_center/loss-0.0057-304.pkl" \
 	--checkpoint "/data3/leics/checkpoints/rot/rot4_1e-4/best.pkl" \
-	--dataroot "/data3/leics/dataset/mesh/remesh_before" \
-	--before_path "/data3/leics/dataset/mesh/single_pointcloud_before256" \
-	--after_path "/data3/leics/dataset/mesh/single_pointcloud_after256" \
+	--dataroot "/data/lcs/dataset/teeth_full/single_remesh_before" \
+	--before_path "/data3/leics/dataset/teeth_full/single_pointcloud_before256" \
+	--after_path "/data3/leics/dataset/teeth_full/single_pointcloud_after256" \
 	--paramroot "/data3/leics/dataset/mesh/single_after_axis_revert" \
 	--batch_size 4 --n_classes 40 \
 	--n_epoch 700 \

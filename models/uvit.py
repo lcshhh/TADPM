@@ -183,11 +183,7 @@ class UViT(nn.Module):
         self.extras = 33
         self.label_emb = nn.Sequential(
             nn.Linear(1827, embed_dim),
-            nn.SiLU(),
-            nn.Linear(embed_dim, embed_dim),
-            nn.SiLU(),
-            nn.Linear(embed_dim, embed_dim),
-            nn.SiLU(),
+            nn.GELU(),
             nn.Linear(embed_dim, embed_dim),
         )
 
@@ -211,7 +207,16 @@ class UViT(nn.Module):
 
         self.norm = norm_layer(embed_dim)
         self.patch_dim = patch_size ** 2 * in_chans
-        self.decoder_pred = nn.Linear(embed_dim, self.patch_dim, bias=True)
+        # self.decoder_pred = nn.Linear(embed_dim, self.patch_dim, bias=True)
+        self.decoder_pred = nn.Sequential(
+            nn.Linear(embed_dim, 512),
+            nn.GELU(),
+            nn.Linear(512, 256),
+            nn.GELU(),
+            nn.Linear(256, self.patch_dim),
+            nn.GELU(),
+            nn.Linear(self.patch_dim, self.patch_dim),
+        )
         # self.final_layer = nn.Sequential(
         #     nn.Linear(32*in_chans, 32*in_chans),
         #     nn.GELU(),
@@ -273,16 +278,16 @@ class UViT(nn.Module):
         # x = einops.rearrange(x,'b (n c) -> (b n) c',n=32)
 
         # diffusion2
-        # x = einops.rearrange(x,'b c w h -> (b w h) c')
-        # x[:,3:] = pre_handle(x[:,3:].clone())
-        # x = einops.rearrange(x,'(b n) c -> b n c',n=32)
-
-        # train
-        x = einops.rearrange(x,'b c w h -> b (w h c)')
-        x = self.final_layer(x)
-        x = einops.rearrange(x,'b (n c) -> (b n) c',n=32)
+        x = einops.rearrange(x,'b c w h -> (b w h) c')
         x[:,3:] = pre_handle(x[:,3:].clone())
         x = einops.rearrange(x,'(b n) c -> b n c',n=32)
+
+        # train
+        # x = einops.rearrange(x,'b c w h -> b (w h c)')
+        # x = self.final_layer(x)
+        # x = einops.rearrange(x,'b (n c) -> (b n) c',n=32)
+        # x[:,3:] = pre_handle(x[:,3:].clone())
+        # x = einops.rearrange(x,'(b n) c -> b n c',n=32)
         return x
 
 if __name__ == '__main__':

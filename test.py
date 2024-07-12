@@ -162,25 +162,25 @@ def transform_teeth(index,centers,RR):
     meshes = []
     gt_meshes = []
     fdis = []
-    # for i in range(32):
-    #     path = os.path.join('/data3/leics/dataset/mesh/single_before',f'{index}_{i}.obj')
-    #     gt_path = os.path.join('/data3/leics/dataset/mesh/single_after',f'{index}_{i}.obj')
-    #     if os.path.exists(path) and os.path.exists(gt_path):
-    #         mesh = trimesh.load_mesh(path)
-    #         gt_mesh = vedo.Mesh(gt_path)
-    #         before_mesh = trimesh.load_mesh(path)
-    #         before_meshes.append(vedo.trimesh2vedo(before_mesh))
-    #         mesh.vertices = np.matmul((mesh.vertices - mesh.centroid),RR[i].cpu().numpy()) + centers[i].cpu().numpy()
-    #         meshes.append(vedo.trimesh2vedo(mesh))
-    #         gt_meshes.append(gt_mesh)
-    #         fdis.append(i)
-    # mesh = vedo.merge(meshes)
-    # before_mesh = vedo.merge(before_meshes)
-    # gt_mesh = vedo.merge(gt_meshes)
-    # os.makedirs('/data3/leics/outputs',exist_ok=True)
-    # vedo.write(mesh,f'/data3/leics/outputs/after{index}.obj')
-    # vedo.write(before_mesh,f'/data3/leics/outputs/before{index}.obj')
-    # vedo.write(gt_mesh,f'/data3/leics/outputs/gt{index}.obj')
+    for i in range(32):
+        path = os.path.join('/data/lcs/dataset/teeth_full/single_normed_before',f'{index}_{i}.obj')
+        gt_path = os.path.join('/data/lcs/dataset/teeth_full/single_normed_after',f'{index}_{i}.obj')
+        if os.path.exists(path) and os.path.exists(gt_path):
+            mesh = trimesh.load_mesh(path)
+            gt_mesh = vedo.Mesh(gt_path)
+            before_mesh = trimesh.load_mesh(path)
+            before_meshes.append(vedo.trimesh2vedo(before_mesh))
+            mesh.vertices = np.matmul((mesh.vertices - mesh.centroid),RR[i].cpu().numpy()) + centers[i].cpu().numpy()
+            meshes.append(vedo.trimesh2vedo(mesh))
+            gt_meshes.append(gt_mesh)
+            fdis.append(i)
+    mesh = vedo.merge(meshes)
+    before_mesh = vedo.merge(before_meshes)
+    gt_mesh = vedo.merge(gt_meshes)
+    os.makedirs('/data3/leics/outputs',exist_ok=True)
+    vedo.write(mesh,f'/data3/leics/outputs/after{index}.obj')
+    vedo.write(before_mesh,f'/data3/leics/outputs/before{index}.obj')
+    vedo.write(gt_mesh,f'/data3/leics/outputs/gt{index}.obj')
     # os.makedirs('/data3/leics/output2s',exist_ok=True)
     # os.makedirs(f'/data3/leics/output2s/{index-1082}',exist_ok=True)
     # centroid = vedo.vedo2trimesh(mesh).centroid
@@ -188,29 +188,28 @@ def transform_teeth(index,centers,RR):
     #     tmp_mesh = meshes[i]
     #     tmp_mesh.vertices = (tmp_mesh.vertices - centroid) * 40
     #     meshes[i].export(f'/data3/leics/output2s/{index-1082}/{rearrange_index(i)}')
-    for i in range(32):
-        path = os.path.join('/data3/leics/dataset/mesh/single_before',f'{index}_{i}.obj')
-        if os.path.exists(path):
-            mesh = trimesh.load_mesh(path)
-            before_mesh = trimesh.load_mesh(path)
-            before_meshes.append(vedo.trimesh2vedo(before_mesh))
-            # after_mesh = move_mesh(mesh,centroid[i],output[i])
-            # after_mesh = transform_mesh(mesh,output[i])
-            # mesh.vertices = mesh.vertices - mesh.centroid + centers[i].cpu().numpy()
-            mesh.vertices = np.matmul((mesh.vertices - mesh.centroid),RR[i].cpu().numpy()) + centers[i].cpu().numpy()
-            meshes.append(vedo.trimesh2vedo(mesh))
-            fdis.append(i)
-    mesh = vedo.merge(meshes)
-    before_mesh = vedo.merge(before_meshes)
-    os.makedirs('/data3/leics/output2s',exist_ok=True)
-    os.makedirs(f'/data3/leics/output2s/{index-1082}',exist_ok=True)
-    centroid = vedo.vedo2trimesh(mesh).centroid
-    for i in range(len(fdis)):
-        tmp_mesh = vedo.vedo2trimesh(meshes[i])
-        tmp_mesh.vertices = (tmp_mesh.vertices - centroid) * 40
-        tmp_mesh.export(f'/data3/leics/output2s/{index-1082}/{rearrange_index(fdis[i])}.stl')
-    # vedo.write(mesh,f'/data3/leics/outputs_test/after{index}.obj')
-    # vedo.write(before_mesh,f'/data3/leics/outputs_test/before{index}.obj')
+    # for i in range(32):
+    #     path = os.path.join('/data3/leics/dataset/mesh/single_before',f'{index}_{i}.obj')
+    #     if os.path.exists(path):
+    #         mesh = trimesh.load_mesh(path)
+    #         before_mesh = trimesh.load_mesh(path)
+    #         before_meshes.append(vedo.trimesh2vedo(before_mesh))
+    #         # after_mesh = move_mesh(mesh,centroid[i],output[i])
+    #         # after_mesh = transform_mesh(mesh,output[i])
+    #         # mesh.vertices = mesh.vertices - mesh.centroid + centers[i].cpu().numpy()
+    #         mesh.vertices = np.matmul((mesh.vertices - mesh.centroid),RR[i].cpu().numpy()) + centers[i].cpu().numpy()
+    #         meshes.append(vedo.trimesh2vedo(mesh))
+    #         fdis.append(i)
+    # mesh = vedo.merge(meshes)
+    # before_mesh = vedo.merge(before_meshes)
+    # os.makedirs('/data3/leics/output2s',exist_ok=True)
+    # os.makedirs(f'/data3/leics/output2s/{index-1082}',exist_ok=True)
+    # centroid = vedo.vedo2trimesh(mesh).centroid
+    # for i in range(len(fdis)):
+    #     tmp_mesh = vedo.vedo2trimesh(meshes[i])
+    #     tmp_mesh.vertices = (tmp_mesh.vertices - centroid) * 40
+    #     tmp_mesh.export(f'/data3/leics/output2s/{index-1082}/{rearrange_index(fdis[i])}.stl')
+
 
 def robust_compute_rotation_matrix_for_diffusion(poses,test=False):
     """
@@ -335,7 +334,7 @@ if __name__ == '__main__':
     # train_dataset = dataManager.train_dataset()
     # test_dataset = dataManager.test_dataset()
     train_dataset = FullTeethTestDataset(dataroot,paramroot,'train.txt',True,args,256)
-    test_dataset = FullTeethTestDataset(dataroot,paramroot,'test.txt',False,args,256)
+    test_dataset = FullTeethTestDataset(dataroot,paramroot,'valid.txt',False,args,256)
     print(len(train_dataset))
     print(len(test_dataset))
     train_data_loader = data.DataLoader(train_dataset, num_workers=args.n_worker, batch_size=args.batch_size,
