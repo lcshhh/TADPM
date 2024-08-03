@@ -199,10 +199,8 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         after_points = rearrange(after_points,'b n p c -> (b n) p c')
         loss = criterion(predicted_points,after_points).sum(dim=(1,2))
         loss = 0.001*(loss * masks.flatten()).sum()
-        # loss2 = 0.03*((criterion(outputs,gt_params).sum(dim=-1)) * masks).sum()
-        # print('loss1:',loss)
-        # print('loss2',loss2)
-        # loss = loss + loss2
+        loss2 = 0.03*((criterion(outputs,gt_params).sum(dim=-1)) * masks).sum()
+        loss = loss + loss2
         loss.backward()
         optim.step()
         running_loss += loss.item() * faces.size(0)
