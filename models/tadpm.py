@@ -30,33 +30,7 @@ class TADPM(nn.Module):
             decoder_num_heads=args.decoder_num_heads,
             decoder_depth=args.decoder_depth
         )
-        # self.encoder.requires_grad_(False)
-        self.use_mlp = args.use_mlp
-        if self.use_mlp:
-            self.regressor = nn.Sequential(
-                nn.Linear(1827, 1024),
-                # nn.Dropout(0.3),
-                nn.GELU(),
-                nn.Linear(1024, 512),
-                # nn.Dropout(0.3),
-                nn.GELU(),
-                nn.Linear(512,256),
-                nn.GELU(),
-                nn.Linear(256, 9)
-            )
-            # self.regressor = nn.Sequential(
-            #     nn.Linear(1827, 1024),
-            #     # nn.Dropout(0.3),
-            #     nn.GELU(),
-            #     nn.Linear(1024, 512),
-            #     # nn.Dropout(0.3),
-            #     nn.GELU(),
-            #     nn.Linear(512,32*9),
-            #     nn.GELU(),
-            #     nn.Linear(32*9, 32*9)
-            # )
-        else:
-            self.regressor = diffuse(1827)
+        self.regressor = diffuse(1827)
         embed_dim = args.dim
         self.embed_dim = embed_dim
         self.use_pointnet = args.use_pointnet
@@ -114,10 +88,7 @@ class TADPM(nn.Module):
 
         # embedding = self.bn2(embedding.transpose(1,2)).transpose(1,2)
         # embedding = embedding.mean(dim=1)
-        if self.use_mlp:
-            dofs = self.regressor(embedding).view(bs,n,-1)
-        else:
-            dofs = self.regressor(gt_6dof,embedding)
+        dofs = self.regressor(gt_6dof,embedding)
         return dofs
 
  

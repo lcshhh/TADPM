@@ -263,24 +263,11 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         masks = masks.cuda()
         n_samples += faces.shape[0]
         with torch.no_grad():
-            if args.use_mlp:
-                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
-            else:
-                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
+            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
             predicted_centroid = outputs[:,:,:3]
             dofs = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
             criterion = nn.MSELoss(reduction='none')
-            if args.use_mlp:
-                rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
-            else:
-                rot_matrix = robust_compute_rotation_matrix_for_diffusion(dofs,True)
-            # predicted_points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
-            # predicted_points = torch.bmm(predicted_points,rot_matrix)
-            # predicted_points = predicted_points + rearrange(predicted_centroid,'b n c->(b n) c').unsqueeze(1)
-            # after_points = rearrange(after_points,'b n p c -> (b n) p c')
-            # loss = criterion(predicted_points,after_points).sum(dim=(1,2))
-            # loss = 0.001*(loss * masks.flatten()).sum()
-            # running_loss += loss.item() * faces.size(0)
+            rot_matrix = robust_compute_rotation_matrix_for_diffusion(dofs,True)
             rot_matrix = rearrange(rot_matrix,'(b n) c1 c2 -> b n c1 c2', n=32)
             for i in range(index.shape[0]):
                 transform_teeth(index[i],predicted_centroid[i],rot_matrix[i])
@@ -313,7 +300,6 @@ if __name__ == '__main__':
     parser.add_argument('--before_path',type=str, required=True)
     parser.add_argument('--after_path',type=str, required=True)
     parser.add_argument('--checkpoint',type=str,default='')
-    parser.add_argument('--use_mlp', action='store_true')
     parser.add_argument('--use_pointnet', action='store_true')
     parser.add_argument('--use_ae', action='store_true')
     parser.add_argument('--pure_test', action='store_true')

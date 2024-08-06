@@ -182,17 +182,11 @@ def train(net, optim, names, scheduler, train_dataset, epoch, args):
         n_samples += faces.shape[0]
         before_points = before_points.to(torch.float32).cuda()
         after_points = after_points.to(torch.float32).cuda()
-        if args.use_mlp:
-            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
-        else:
-            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
+        outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
         predicted_centroid = outputs[:,:,:3]
         dofs = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
         criterion = nn.MSELoss(reduction='none')
-        if args.use_mlp:
-            rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
-        else:
-            rot_matrix = robust_compute_rotation_matrix_for_diffusion(dofs)
+        rot_matrix = robust_compute_rotation_matrix_for_diffusion(dofs)
         predicted_points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
         predicted_points = torch.bmm(predicted_points,rot_matrix)
         predicted_points = predicted_points + rearrange(predicted_centroid,'b n c->(b n) c').unsqueeze(1)
@@ -244,19 +238,13 @@ def test(net, names, optimizer, scheduler, test_dataset, epoch, args, autoencode
         n_samples += faces.shape[0]
         # trans_6dof = trans_6dof.to(torch.float32).cuda()
         with torch.no_grad():
-            if args.use_mlp:
-                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points).to(torch.float32).cuda()
-            else:
-                outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
+            outputs = net(faces, feats, centers, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
             # loss = 512*chamfer_loss(before_points,after_points,centroid, outputs, masks)
             # loss = chamfer_loss(before_points,after_points,outputs/10, masks)
             predicted_centroid = outputs[:,:,:3]
             dofs = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
             criterion = nn.MSELoss(reduction='none')
-            if args.use_mlp:
-                rot_matrix = robust_compute_rotation_matrix_from_ortho6d(dofs)
-            else:
-                rot_matrix = robust_compute_rotation_matrix_for_diffusion(dofs,True)
+            rot_matrix = robust_compute_rotation_matrix_for_diffusion(dofs,True)
             predicted_points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
             predicted_points = torch.bmm(predicted_points,rot_matrix)
             predicted_points = predicted_points + rearrange(predicted_centroid,'b n c->(b n) c').unsqueeze(1)

@@ -24,4 +24,3 @@ python test.py \
 	--dim 768 \
 	--use_pointnet \
 	--lower \
-	--use_mlp 

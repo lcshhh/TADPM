@@ -167,7 +167,6 @@ if __name__ == '__main__':
     parser.add_argument('--n_worker', type=int, default=8)
     parser.add_argument('--encoder_checkpoint',type=str,default='')
     parser.add_argument('--checkpoint',type=str,default='')
-    parser.add_argument('--use_mlp', action='store_true')
     parser.add_argument('--use_pointnet', action='store_true')
     parser.add_argument('--use_ae', action='store_true')
     parser.add_argument('--pure_test', action='store_true')
