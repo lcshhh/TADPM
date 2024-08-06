@@ -4,9 +4,9 @@ python train.py train \
 	--before_path "/data3/leics/dataset/mesh/single_pointcloud_before256" \
 	--after_path "/data3/leics/dataset/mesh/single_pointcloud_after256" \
 	--paramroot "/data3/leics/dataset/mesh/single_after_axis_revert" \
-	--batch_size 32 --n_classes 40 \
+	--batch_size 16 --n_classes 40 \
 	--n_epoch 700 \
-	--name "diffusion5" \
+	--name "diffusion6" \
 	--weight_decay 0.05 \
 	--mask_ratio 0.5 \
 	--channels 10 --patch_size 64 \

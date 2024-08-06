@@ -41,7 +41,8 @@ def register(index,dataroot1,dataroot2,outputroot):
           #   dofs[i] = se3_log_map(torch.from_numpy(matrix).transpose(0,1).unsqueeze(0))
           #   matrix = matrix[:6]
             rot_matrix[i] = torch.from_numpy(matrix)
-          #   exit()
+            print(matrix)
+            exit()
      # torch.save(dofs,os.path.join(outputroot,f'{index}.pkl'))
      torch.save(rot_matrix,os.path.join(outputroot,f'{index}.pkl'))
 
@@ -49,6 +50,7 @@ def register(index,dataroot1,dataroot2,outputroot):
 
 dataroot1 = '/data3/leics/dataset/rot_matrix/single_before_centered'
 dataroot2 = '/data3/leics/dataset/rot_matrix/single_after_centered'
+path = '/data3/leics/dataset/rot_matrix/param/1081.p kl'
 with open('val.txt','r') as f:
      indexes = [int(i.strip()) for i in f.readlines()]
 outputroot = '/data3/leics/dataset/rot_matrix/param'
