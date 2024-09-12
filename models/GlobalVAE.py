@@ -22,6 +22,13 @@ class GlobalVAE(nn.Module):
             checkpoint = torch.load(config.args.PCN_checkpoint)
             for i in range(32):
                 self.local_encoders[i].load_state_dict(checkpoint['base_model'])
+        self.predictors = nn.ModuleList([nn.Sequential(
+            nn.Linear(self.latent_dim,128),
+            nn.LeakyReLU(),
+            nn.Linear(128,32),
+            nn.LeakyReLU(),
+            nn.Linear(32,8),
+        ) for _ in range (32)])
     
     def decode(self, z):
         B = z.shape[0]
@@ -44,8 +51,9 @@ class GlobalVAE(nn.Module):
         log_var=torch.stack([t[2] for t in rep],dim=1)
 
         xx = self.decoder(h,embedding,mask)
-        reconstructed = torch.stack([self.local_encoders[i].decode(xx[:,i]) for i in range(32)],dim=1)
-        return mu, log_var, reconstructed
+        # reconstructed = torch.stack([self.local_encoders[i].decode(xx[:,i]) for i in range(32)],dim=1)
+        predicted_axis = torch.stack([self.predictors[i](xx[:,i]) for i in range(32)],dim=1)
+        return mu, log_var, predicted_axis
 
 class Encoder(nn.Module):
     def __init__(self, config):
