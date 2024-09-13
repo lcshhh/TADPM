@@ -1,8 +1,8 @@
 ENT="python second_stage.py "
 cfg="config/GlobalVAE.yaml"
-ckpts="/data3/leics/dataset/checkpoints/global/GlobalVAE_axis/ckpt-best.pth"
+ckpts="/data3/leics/dataset/checkpoints/global/GlobalVAE_axis3/ckpt-best.pth"
 saveroot="/data3/leics/dataset/checkpoints/global"
-exp_name="GlobalVAE_axis"
+exp_name="GlobalVAE_axis2"
 launcher="none"
 
 

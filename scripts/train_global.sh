@@ -1,7 +1,7 @@
 ENT="python second_stage.py "
 cfg="config/GlobalVAE.yaml"
 saveroot="/data3/leics/dataset/checkpoints/global"
-exp_name="GlobalVAE_axis2"
+exp_name="GlobalVAE_axis3"
 launcher="none"
 
 

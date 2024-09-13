@@ -6,6 +6,7 @@ import time
 from utils.logger import *
 from utils.AverageMeter import AverageMeter
 from pytorch3d.loss import chamfer_distance
+from einops import rearrange
 
 import numpy as np
 from torchvision import transforms
@@ -25,16 +26,59 @@ def get_center_and_axis(x):
     normal2[:,:,2] = -(normal1[:,:,0]*x[:,:,6]+normal1[:,:,1]*x[:,:,7])/normal1[:,:,2]
     return centers,normal1,normal2
 
-def get_center_and_axis(x):
-    '''
-    x:[bs,32,8]
-    '''
-    centers = x[:,:,:3]
-    normal1 = x[:,:,3:6]
-    normal2 = torch.zeros_like(normal1).to(normal1.device)
-    normal2[:,:,:2] = x[:,:,6:]
-    normal2[:,:,2] = -(normal1[:,:,0]*x[:,:,6]+normal1[:,:,1]*x[:,:,7])/normal1[:,:,2]
-    return centers,normal1,normal2
+def rotation_matrix(vec1, vec2, masks=None):
+    """ Find the rotation matrix that aligns vec1 to vec2
+    :param vec1: A 3d "source" vector
+    :param vec2: A 3d "destination" vector
+    :return mat: A transform matrix (3x3) which when applied to vec1, aligns it with vec2.
+    """
+    # a, b = (vec1 / np.linalg.norm(vec1)).reshape(3), (vec2 / np.linalg.norm(vec2)).reshape(3)
+
+
+    bs = vec1.shape[0]
+    a = nn.functional.normalize(vec1,dim=-1)
+    b = nn.functional.normalize(vec2,dim=-1)
+    n_vector = torch.cross(a, b, dim=-1)
+    c = torch.sum(a*b,dim=-1)
+    s = torch.norm(n_vector,dim=-1)
+    # s.masked_fill_(masks.flatten(),1)
+    n_matrix = torch.zeros(bs,3,3).cuda()
+    for i in range(bs):
+        n_matrix[i] = torch.tensor([[0, -n_vector[i,2], n_vector[i,1]],
+                             [n_vector[i,2], 0, -n_vector[i,0]],
+                             [-n_vector[i,1], n_vector[i,0], 0]], dtype=torch.float32)
+    I = torch.stack([torch.eye(3) for _ in range(bs)],dim=0).cuda()
+    rotation_matrix = I + n_matrix + ((torch.bmm(n_matrix,n_matrix) * ((1 - c.view(-1,1,1)) / (s.view(-1,1,1) ** 2))))
+    return rotation_matrix
+
+def rotation_matrix_with_axis(theta, v):
+    """
+    创建绕任意轴旋转的旋转矩阵
+    :param theta: 旋转角度（弧度）
+    :param v: 旋转轴的单位向量
+    :return: 旋转矩阵
+    """
+    bs = theta.shape[0]
+    K = torch.zeros(bs,3,3).cuda()
+    for i in range(bs):
+        K[i] = torch.tensor([[0, -v[i,2], v[i,1]],
+                        [v[i,2], 0, -v[i,0]],
+                        [-v[i,1], v[i,0], 0]]).cuda()
+    I = torch.stack([torch.eye(3) for _ in range(bs)],dim=0).cuda()
+    R = I + torch.sin(theta).view(-1,1,1) * K + (1 - torch.cos(theta).view(-1,1,1)) * torch.bmm(K, K)
+    return R
+
+def align_axis(normal1,normal2,gt_normal1,gt_normal2, masks=None):
+    rot_matrix = rotation_matrix(gt_normal1.view(-1,3),normal1.view(-1,3),masks).transpose(2,1) #将z轴对齐
+
+    after_axis = torch.bmm(gt_normal2.view(-1,3).unsqueeze(1),rot_matrix)
+    rho = torch.cross(after_axis.squeeze(1), normal2.view(-1,3),dim=-1)
+    eps = 1e-7
+    theta = torch.acos(torch.clamp(torch.sum(normal2.view(-1,3)*after_axis.squeeze(1),dim=-1),min=-1+eps,max=1-eps)).cuda()
+    theta = -torch.sign(torch.sum(normal1.view(-1,3)*rho,dim=-1)) * theta
+    R = rotation_matrix_with_axis(theta,normal1.view(-1,3))
+    RR = torch.bmm(rot_matrix,R)
+    return RR
 
 def train_global(args, config, train_writer, val_writer, logger):
     # build dataset
@@ -76,7 +120,7 @@ def train_global(args, config, train_writer, val_writer, logger):
         batch_start_time = time.time()
         batch_time = AverageMeter()
         data_time = AverageMeter()
-        losses = AverageMeter(['loss','kl_loss','center_loss','axis_loss'])
+        losses = AverageMeter(['loss','kl_loss','center_loss','cd_loss','axis_loss'])
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
 
@@ -103,23 +147,33 @@ def train_global(args, config, train_writer, val_writer, logger):
             criterion2 = nn.CosineEmbeddingLoss(reduction='none')
             # axis_loss = torch.FloatTensor([0.]).to(device)
             # for i in range(bs):
-            # target = torch.ones(point.shape[0]).cuda()
+            target = torch.ones(point.shape[0]).cuda()
                 # axis_loss += (criterion2(normal1[i],axis[i,:,3:6],target) + criterion2(normal2[i],axis[i,:,6:],target)).mean()
-            # axis_loss = torch.stack([criterion2(normal1[:,i],axis[:,i,3:6],target) + criterion2(normal2[:,i],axis[:,i,6:],target) for i in range(32)],dim=1)
-            axis_loss = 50*((criterion1(normal1,gt_normal1) + criterion1(normal2,gt_normal2)) * masks.unsqueeze(2)).mean()
-            # axis_loss = 300*(axis_loss * masks).mean()
-            loss = kl_loss + axis_loss + center_loss
+            axis_loss = torch.stack([criterion2(normal1[:,i],axis[:,i,3:6],target) + criterion2(normal2[:,i],axis[:,i,6:],target) for i in range(32)],dim=1)
+            axis_loss = 100*(axis_loss * masks.unsqueeze(2)).mean()
+            normal1 = nn.functional.normalize(normal1,dim=-1)
+            normal2 = nn.functional.normalize(normal2,dim=-1)
+            gt_normal1 = nn.functional.normalize(gt_normal1,dim=-1)
+            gt_normal2 = nn.functional.normalize(gt_normal2,dim=-1)
+            RR = align_axis(normal1,normal2,gt_normal1,gt_normal2,masks<1)
+            original_point_cloud = rearrange(point,'b n p c -> (b n) p c')
+            after_cloud = original_point_cloud - rearrange(centers,'b n c -> (b n) c').unsqueeze(1)
+            after_cloud = torch.bmm(after_cloud,RR)
+            after_cloud = after_cloud + rearrange(predicted_centers,'b n c -> (b n) c').unsqueeze(1)
+            cd_loss, _ = chamfer_distance(original_point_cloud,after_cloud,batch_reduction=None)
+            cd_loss = 500*(cd_loss * masks.view(-1,1)).mean()
+            loss = kl_loss + cd_loss + center_loss + axis_loss
             #######
 
             loss.backward()
             optimizer.step()
-            losses.update([loss.item(),kl_loss.item(),center_loss.item(),axis_loss.item()])
+            losses.update([loss.item(),kl_loss.item(),center_loss.item(),cd_loss.item(),axis_loss.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
             
             if idx % 5 == 0:
-                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss kl_loss center_loss axis_loss = %s lr = %.6f' %
+                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss kl_loss center_loss cd_loss axis_loss = %s lr = %.6f' %
                             (epoch, config.max_epoch, idx + 1, n_batches, batch_time.val(), data_time.val(),
                             ['%.4f' % l for l in losses.val()], optimizer.param_groups[0]['lr']))
         if isinstance(scheduler, list):
@@ -134,7 +188,7 @@ def train_global(args, config, train_writer, val_writer, logger):
 
         # print_log('[Training] EPOCH: %d EpochTime = %.3f (s) Losses = %s lr = %.6f' %
         #     (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']), logger = logger)
-        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss kl_loss center_loss axis_loss = %s lr = %.6f' %
+        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss kl_loss center_loss cd_loss axis_loss = %s lr = %.6f' %
             (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']))
 
         if epoch % args.val_freq == 0 and epoch != 0:
