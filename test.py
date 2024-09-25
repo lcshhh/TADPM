@@ -28,46 +28,32 @@ import torch
 import open3d as o3d
 import numpy as np
 import os
+import torch.nn as nn
 import random
 
-# def read_pointcloud(path):
-#     pcd = o3d.io.read_point_cloud(path)
-#     xyz = np.asarray(pcd.points)
-#     return torch.from_numpy(xyz)
+# tooth = '/data3/leics/dataset/teeth_full/single_normed_after'
+# index = 161
+# axis = f'/data3/leics/dataset/teeth_full/single_normed_after_axis/{index}.npy'
+# outputpath = f'/data3/leics/dataset/tmp'
+# os.system(f'cp {axis} {outputpath}')
+# for i in range(32):
+#     tooth_path = os.path.join(tooth,f'{index}_{i}.obj')
+#     if os.path.exists(tooth_path):
+#         os.system(f'cp {tooth_path} {outputpath}')
+import trimesh
+with open('valid.txt') as f:
+    indexes = [int(i.strip()) for i in f.readlines()]
+num = 0
+for index in indexes:
+    for i in range(16):
+        mesh_path = f'/data3/leics/dataset/teeth_full/single_normed_after/{index}_{i}.obj'
+        if os.path.exists(mesh_path):
+            mesh = trimesh.load_mesh(mesh_path)
+            if mesh.centroid[2] < 0:
+                print(index)
+                num+=1
+                break
+print(num)
+    
 
-# def transform_vertices(vertices,centroids,dofs):
-#     '''
-#     vertices: [bs, 32, pt_num, 3]
-#     centroids: [bs, 32, 3]
-#     dofs: [bs, 32, 6]
-#     '''
-#     angles = rearrange(dofs[:,:,3:]*torch.pi/6,'b n c -> (b n) c')
-#     move = rearrange(dofs[:,:,:3]/5,'b n c -> (b n) c').unsqueeze(1) #[b*n,1,3]
-#     centroids = rearrange(centroids, 'b n c -> (b n) c').unsqueeze(1)
-#     R = euler_angles_to_matrix(angles,'XYZ')
-#     vertices = rearrange(vertices,'b n pn c -> (b n) pn c')
-#     vertices = torch.bmm(vertices - centroids,R) + centroids + move
-#     return vertices
 
-# vertices = read_pointcloud('/data/lcs/dataset/teeth_full/pointcloud_before512/1178_21.ply')
-# pcd = o3d.geometry.PointCloud()
-# pcd.points = o3d.utility.Vector3dVector(vertices)
-# o3d.io.write_point_cloud('/data/lcs/dataset/homework/before.ply', pcd)
-# transform_vertices(vertices)
-# with open('valid.txt') as f:
-#     indexes = [int(i.strip()) for i in f.readlines()]
-# random.shuffle(indexes)
-# train_ratio = 0.9
-# split_point = int(len(indexes) * train_ratio)
-# train_objs = indexes[:split_point]
-# test_objs = indexes[split_point:]
-# with open('train.txt','w') as f:
-#     for index in train_objs:
-#         f.write(str(index)+'\n')
-
-# with open('test.txt','w') as f:
-#     for index in test_objs:
-#         f.write(str(index)+'\n')
-def create_attn_mask(masks):
-    attn_mask = torch.mm(masks.unsqueeze(1),masks.unsqueeze(0))
-    return attn_mask == 0

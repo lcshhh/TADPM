@@ -4,22 +4,21 @@ from einops import rearrange
 from models.GlobalVAE import GlobalVAE
 from models.diffusion import diffusion
 from timm.models.vision_transformer import PatchEmbed, Block
+from models.PCN import PCN
+from utils.builder import MODELS
 
+@MODELS.register_module()
 class DiffusionVAE(nn.Module):
-    def __init__(self, in_dim, args):
+    def __init__(self, config):
         super().__init__()
-        self.vae = GlobalPointVAE(in_dim,args)
-        self.condictor = GlobalPointVAE(in_dim,args)
-        self.z_dim = args.z_dim
-        if args.resume != '':
-            checkpoint = torch.load(args.resume)
-            self.vae.load_state_dict(checkpoint['model_state_dict'])
-            self.condictor.load_state_dict(checkpoint['model_state_dict'])
+        self.vae = GlobalVAE(config)
         # self.vae.requires_grad_(False)
-        self.dpm = diffusion(in_features=3)
-        # if args.dpm_checkpoint != '':
-        #     checkpoint = torch.load(args.dpm_checkpoint)
-        #     self.dpm.load_state_dict(checkpoint['model_state_dict'])
+        self.condictors = nn.ModuleList([PCN(config.PCN) for _ in range(32)])
+        self.z_dim = config.z_dim
+        if config.args.vae_ckpts != '':
+            checkpoint = torch.load(config.args.vae_ckpts)
+            self.vae.load_state_dict(checkpoint['base_model'])
+        self.dpm = diffusion(config.latent_dim)
     
     def decode(self, z):
         B = z.shape[0]
@@ -27,9 +26,9 @@ class DiffusionVAE(nn.Module):
         return out
 
 
-    def forward(self, pointcloud, axis, before_pointcloud, before_axis):
+    def forward(self, pointcloud, axis, before_pointcloud):
         latents = self.vae.encode(pointcloud,axis)
-        conditions = self.condictor.encode(before_pointcloud, before_axis)
+        conditions = torch.stack([self.condictors[i].encode(before_pointcloud[:,i]) for i in range(32)],dim=1)
         predicted_latents = self.dpm(latents, conditions)
         
         # out = out.view(B, 512, C)

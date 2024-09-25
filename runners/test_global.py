@@ -22,7 +22,7 @@ def get_center_and_axis(x):
     normal2[:,:,2] = -(normal1[:,:,0]*x[:,:,6]+normal1[:,:,1]*x[:,:,7])/normal1[:,:,2]
     return centers,normal1,normal2
 
-def rotation_matrix(vec1, vec2, masks=None):
+def rotation_matrix(vec1, vec2):
     """ Find the rotation matrix that aligns vec1 to vec2
     :param vec1: A 3d "source" vector
     :param vec2: A 3d "destination" vector
@@ -64,8 +64,8 @@ def rotation_matrix_with_axis(theta, v):
     R = I + torch.sin(theta).view(-1,1,1) * K + (1 - torch.cos(theta).view(-1,1,1)) * torch.bmm(K, K)
     return R
 
-def align_axis(normal1,normal2,gt_normal1,gt_normal2, masks=None):
-    rot_matrix = rotation_matrix(gt_normal1.view(-1,3),normal1.view(-1,3),masks).transpose(2,1) #将z轴对齐
+def align_axis(normal1,normal2,gt_normal1,gt_normal2):
+    rot_matrix = rotation_matrix(gt_normal1.view(-1,3),normal1.view(-1,3)).transpose(2,1) #将z轴对齐
 
     after_axis = torch.bmm(gt_normal2.view(-1,3).unsqueeze(1),rot_matrix)
     rho = torch.cross(after_axis.squeeze(1), normal2.view(-1,3),dim=-1)
@@ -94,6 +94,7 @@ def test_global(args, config, logger):
     # optimizer & scheduler
     logger.info(f"[TEST] Start test")
     base_model.eval()  # set model to eval mode
+
     losses = AverageMeter(['loss','rec','kl'])
     with torch.no_grad():
         for idx, (index,point,centers,axis,masks) in enumerate(test_dataloader):
@@ -119,13 +120,16 @@ def test_global(args, config, logger):
             normal2 = nn.functional.normalize(normal2,dim=-1)
             gt_normal1 = nn.functional.normalize(gt_normal1,dim=-1)
             gt_normal2 = nn.functional.normalize(gt_normal2,dim=-1)
-            RR = align_axis(normal1,normal2,gt_normal1,gt_normal2,masks<1)
+            RR = align_axis(normal1,normal2,gt_normal1,gt_normal2)
             original_point_cloud = rearrange(point,'b n p c -> (b n) p c')
             after_cloud = original_point_cloud - rearrange(centers,'b n c -> (b n) c').unsqueeze(1)
             after_cloud = torch.bmm(after_cloud,RR)
             after_cloud = after_cloud + rearrange(predicted_centers,'b n c -> (b n) c').unsqueeze(1)
             after_cloud = rearrange(after_cloud,'(b n) p c -> b (n p) c',n=32)
-            write_pointcloud(after_cloud[0].cpu().numpy(),'/data3/leics/dataset/test.ply')
+            idx = 0
+            print(masks[idx])
+            write_pointcloud(after_cloud[idx].cpu().numpy(),'/data3/leics/dataset/test.ply')
+            np.save('/data3/leics/dataset/test.npy',torch.cat((predicted_centers[idx],normal1[idx],normal2[idx]),dim=-1).cpu().numpy())
             exit()
 
         logger.info('[TEST] Loss rec_loss kl_loss = %s' % (['%.4f' % l for l in losses.avg()]))

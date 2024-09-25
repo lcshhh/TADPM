@@ -6,6 +6,7 @@ import argparse
 import torch.nn as nn
 import torch.nn.functional as F
 # from model.Dit import DiT
+from models.TeethTransformer import TeethTransformer 
 import math
 import yaml
 
@@ -34,18 +35,18 @@ def extract(a, t, x_shape):
 
 class diffusion(nn.Module):
     def __init__(self,
-        in_features,
+        in_chans,
         sampling_timesteps= 100,
         timesteps = 1000,
         ):
         super(diffusion, self).__init__()
-        self.in_features = in_features
         self.timesteps = timesteps
+        self.in_chans = in_chans
         self.sampling_timesteps = sampling_timesteps
         self.betas = cosine_beta_schedule(self.timesteps).cuda()
         self.alphas = 1. - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
-        self.model = UViT()
+        self.model = TeethTransformer(in_chans=in_chans)
         self.eta = 1
         self.sqrt_alphas_cumprod =  torch.sqrt(self.alphas_cumprod)
         self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1-self.alphas_cumprod)
@@ -67,7 +68,7 @@ class diffusion(nn.Module):
     @torch.no_grad()
     def ddim_sample(self, features,centroid=None):
         batch = features.shape[0]
-        shape = (batch, 32, 256)
+        shape = (batch, 32, self.in_chans)
         total_timesteps, sampling_timesteps, eta = self.timesteps, self.sampling_timesteps, self.eta
 
         # [-1, 0, 1, 2, ..., T-1] when sampling_timesteps == total_timesteps
@@ -75,7 +76,7 @@ class diffusion(nn.Module):
         seq = range(0, self.timesteps, skip)
 
         # x = torch.randn(shape)
-        x = torch.randn(shape).cuda()
+        x = torch.randn(shape).cuda().float()
         seq_next = [-1] + list(seq[:-1])
         x0_preds = []
         xs = [x]
@@ -95,10 +96,10 @@ class diffusion(nn.Module):
                 0 * ((1 - at / at_next) * (1 - at_next) / (1 - at)).sqrt()
             )
             c2 = ((1 - at_next) - c1 ** 2).sqrt()
-            xt_next = at_next.sqrt() * x0_t + c1 * torch.randn_like(x) + c2 * et
+            xt_next = at_next.sqrt() * x0_t + c1 * torch.randn_like(x).cuda().float() + c2 * et
             xs.append(xt_next)
 
-        return xs[-1]
+        return xs[-1].float()
 
     
     def forward(self, batched_inputs, features):

@@ -22,13 +22,13 @@ dataset : {
             },
   val : { NAME: FullTeethDataset,
           train: False,
-          file: files/second_stage/train.txt,
+          file: files/second_stage/test.txt,
           after_path: /data3/leics/dataset/teeth_full/single_normed_after_pointcloud513,
           axis_path: /data3/leics/dataset/teeth_full/single_normed_after_axis,
           npoint: 512},
   test : {  NAME: FullTeethDataset,
             train: False,
-            file: files/second_stage/train.txt,
+            file: files/second_stage/test.txt,
             after_path: /data3/leics/dataset/teeth_full/single_normed_after_pointcloud513,
             axis_path: /data3/leics/dataset/teeth_full/single_normed_after_axis,
             npoint: 512}}
@@ -36,17 +36,17 @@ dataset : {
 model : {
   NAME: GlobalVAE,
   z_dim: 1024, 
-  latent_dim: 256, 
+  latent_dim: 1024, 
   PCN: {
     num_dense: 512, 
-    latent_dim: 256, 
+    latent_dim: 1024, 
     grid_size: 4
   }
 }
 
 
 npoints: 512
-total_bs : 32
+total_bs : 64
 step_per_update : 1
 max_epoch : 300
 grad_norm_clip : 10

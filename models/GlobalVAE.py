@@ -24,17 +24,31 @@ class GlobalVAE(nn.Module):
                 self.local_encoders[i].load_state_dict(checkpoint['base_model'])
         self.predictors = nn.ModuleList([nn.Sequential(
             nn.Linear(self.latent_dim,128),
-            nn.LeakyReLU(),
-            nn.Linear(128,32),
-            nn.LeakyReLU(),
+            nn.GELU(),
+            nn.Linear(128,64),
+            nn.GELU(),
+            nn.Linear(64,32),
+            nn.GELU(),
             nn.Linear(32,8),
         ) for _ in range (32)])
     
     def decode(self, z):
-        B = z.shape[0]
-        out = self.decoder(z)
-        out = out.view(B, 512, -1)
-        return out
+        xx = self.decoder(z)
+        # reconstructed = torch.stack([self.local_encoders[i].decode(xx[:,i]) for i in range(32)],dim=1)
+        predicted_axis = torch.stack([self.predictors[i](xx[:,i]) for i in range(32)],dim=1)
+        return predicted_axis
+    
+    def encode(self, points, centers, mask=None):
+        embeddings = []
+        for i in range(32):
+            embedding = self.local_encoders[i].encode(points[:,i])
+            embeddings.append(embedding)
+        embedding = torch.stack(embeddings,dim=1)
+        x = self.encoder(embedding,mask)
+        rep = [self.reparameterizers[i](x[:,i,:]) for i in range(32)] #(z,mu,logvar)
+
+        h=torch.stack([self.linears[i](rep[i][0]) for i in range(32)],dim=1)
+        return h
 
 
     def forward(self, points, centers, mask=None):
@@ -50,7 +64,8 @@ class GlobalVAE(nn.Module):
         mu=torch.stack([t[1] for t in rep],dim=1)
         log_var=torch.stack([t[2] for t in rep],dim=1)
 
-        xx = self.decoder(h,embedding,mask)
+        # xx = self.decoder(h,embedding,mask)
+        xx = self.decoder(h,mask)
         # reconstructed = torch.stack([self.local_encoders[i].decode(xx[:,i]) for i in range(32)],dim=1)
         predicted_axis = torch.stack([self.predictors[i](xx[:,i]) for i in range(32)],dim=1)
         return mu, log_var, predicted_axis
@@ -60,7 +75,7 @@ class Encoder(nn.Module):
         super().__init__()
         self.pos_embedding = nn.Parameter(torch.randn(1, 32, config.latent_dim))
         self.blocks = nn.ModuleList(
-            [TransformerEncoderLayer(dim=config.latent_dim, n_heads=8) for _ in range(6)]
+            [nn.TransformerEncoderLayer(d_model=config.latent_dim, nhead=8) for _ in range(8)]
         )      
 
     def forward(self, embedding, features=None, mask=None):
@@ -95,14 +110,20 @@ class Decoder(nn.Module):
         super().__init__()
         self.pos_embedding = nn.Parameter(torch.randn(1, 32, config.latent_dim))
         self.blocks =  nn.ModuleList(
-            [nn.TransformerDecoderLayer(d_model=config.latent_dim, nhead=8) for _ in range(6)]
+            [nn.TransformerDecoderLayer(d_model=config.latent_dim, nhead=8) for _ in range(8)]
         )
 
-    def forward(self, h, embedding, mask=None):
-        x = embedding + self.pos_embedding
+    # def forward(self, h, embedding, mask=None):
+    #     x = embedding + self.pos_embedding
+    #     for block in self.blocks:
+    #         x=block(x,h,mask)
+    #     return x
+    def forward(self, h, mask=None):
+        x = h + self.pos_embedding
         for block in self.blocks:
             x=block(x,h,mask)
         return x
+
 
 class Reparameterizer(nn.Module):
 

@@ -9,8 +9,8 @@ import torch
 from tensorboardX import SummaryWriter
 from datasets import *
 from models import *
-from runners.train_global import train_global
-from runners.test_global import test_global
+from runners.train_diffusion import train_diffusion
+from runners.test_diffusion import test_diffusion
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -40,6 +40,7 @@ def get_args():
     parser.add_argument('--save_root', type = str, required=True)
     parser.add_argument('--exp_name', type = str, required=True)
     parser.add_argument('--ckpts', type = str, default='')
+    parser.add_argument('--vae_ckpts', type = str, default='')
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--val_freq', type = int, default=1, help = 'test freq')
     parser.add_argument('--PCN_checkpoint', type = str, default='')
@@ -115,9 +116,9 @@ def main():
         
     # run
     if args.test:
-        test_global(args, config, logger)
+        test_diffusion(args, config, logger)
     else:
-        train_global(args, config, train_writer, val_writer, logger)
+        train_diffusion(args, config, train_writer, val_writer, logger)
 
 
 if __name__ == '__main__':
