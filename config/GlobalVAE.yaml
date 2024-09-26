@@ -1,14 +1,14 @@
 optimizer : {
   type: AdamW,
   kwargs: {
-  lr : 0.0001,
+  lr : 0.00001,
   weight_decay : 0.05
 }}
 
 scheduler: {
   type: CosLR,
   kwargs: {
-    epochs: 300,
+    epochs: 500,
     initial_epochs : 10
 }}
 
@@ -16,21 +16,21 @@ dataset : {
   train : { NAME: FullTeethDataset,
             train: True,
             file: files/second_stage/train.txt,
-            after_path: /data3/leics/dataset/teeth_full/single_normed_after_pointcloud513,
-            axis_path: /data3/leics/dataset/teeth_full/single_normed_after_axis,
+            after_path: /data3/leics/dataset/type2/pointcloud512_after,
+            axis_path: /data3/leics/dataset/type2/single_after_axis,
             npoint: 512
             },
   val : { NAME: FullTeethDataset,
           train: False,
           file: files/second_stage/test.txt,
-          after_path: /data3/leics/dataset/teeth_full/single_normed_after_pointcloud513,
-          axis_path: /data3/leics/dataset/teeth_full/single_normed_after_axis,
+          after_path: /data3/leics/dataset/type2/pointcloud512_after,
+            axis_path: /data3/leics/dataset/type2/single_after_axis,
           npoint: 512},
   test : {  NAME: FullTeethDataset,
             train: False,
             file: files/second_stage/test.txt,
-            after_path: /data3/leics/dataset/teeth_full/single_normed_after_pointcloud513,
-            axis_path: /data3/leics/dataset/teeth_full/single_normed_after_axis,
+            after_path: /data3/leics/dataset/type2/pointcloud512_after,
+            axis_path: /data3/leics/dataset/type2/single_after_axis,
             npoint: 512}}
 
 model : {

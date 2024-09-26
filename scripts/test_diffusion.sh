@@ -1,7 +1,7 @@
 ENT="python third_stage.py "
 cfg="config/DiffusionVAE.yaml"
 saveroot="/data3/leics/dataset/checkpoints/diffusion"
-ckpts="/data3/leics/dataset/checkpoints/diffusion/DiffusionVAE2/ckpt-best.pth"
+ckpts="/data3/leics/dataset/checkpoints/diffusion/DiffusionVAE4/ckpt-best.pth"
 exp_name="DiffusionVAE2"
 launcher="none"
 

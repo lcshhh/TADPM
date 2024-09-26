@@ -120,7 +120,7 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
         batch_start_time = time.time()
         batch_time = AverageMeter()
         data_time = AverageMeter()
-        losses = AverageMeter(['loss','dif_loss','rec_loss'])
+        losses = AverageMeter(['loss','dif_loss','rec_loss','center_loss','axis_loss'])
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
 
@@ -140,12 +140,22 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
 
             # diffusion loss
             criterion = nn.MSELoss(reduction='none')
+            criterion2 = nn.CosineEmbeddingLoss(reduction='none')
             loss1 = criterion(latents,predicted_latents).sum(dim=-1)
-            loss1 = (loss1 * masks).mean()
+            dif_loss = (loss1 * masks).mean()
 
-            # rec loss
+            # center loss
             prediction = base_model.module.decode(predicted_latents)
             predicted_centers, normal1,normal2 = get_center_and_axis(prediction)
+            center_loss = 5000*(criterion(predicted_centers,after_centers) * masks.unsqueeze(2)).mean()
+
+            # axis loss
+            target = torch.ones(index.shape[0]).cuda()
+            axis_loss = torch.stack([criterion2(normal1[:,i],after_axis[:,i,3:6],target) + criterion2(normal2[:,i],after_axis[:,i,6:],target) for i in range(32)],dim=1)
+            axis_loss += (criterion(normal1,after_axis[:,:,3:6]) + criterion(normal2,after_axis[:,:,6:])).sum(dim=-1)
+            axis_loss = 100*(axis_loss * masks).mean()
+
+
             gt_normal1 = before_axis[:,:,3:6]
             gt_normal2 = before_axis[:,:,6:]
             normal1 = nn.functional.normalize(normal1,dim=-1)
@@ -160,19 +170,20 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
             predicted_cloud = before_point_cloud + rearrange(predicted_centers,'b n c -> (b n) c').unsqueeze(1)
             predicted_cloud = rearrange(predicted_cloud,'(b n) p c -> b n p c',n=32)
             loss2 = criterion(predicted_cloud,after_points).sum(dim=(-1,-2))
-            loss2 = (loss2 * masks).mean()
-            loss = loss1 + loss2
+            rec_loss = (loss2 * masks).mean()
+
+            loss = dif_loss + rec_loss + center_loss + axis_loss
             #######
 
             loss.backward()
             optimizer.step()
-            losses.update([loss.item(),loss1.item(),loss2.item()])
+            losses.update([loss.item(),dif_loss.item(),rec_loss.item(),center_loss.item(),axis_loss.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
             
             if idx % 5 == 0:
-                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss dif_loss rec_loss = %s lr = %.6f' %
+                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss dif_loss rec_loss center_loss axis_loss = %s lr = %.6f' %
                             (epoch, config.max_epoch, idx + 1, n_batches, batch_time.val(), data_time.val(),
                             ['%.4f' % l for l in losses.val()], optimizer.param_groups[0]['lr']))
         if isinstance(scheduler, list):
@@ -187,7 +198,7 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
 
         # print_log('[Training] EPOCH: %d EpochTime = %.3f (s) Losses = %s lr = %.6f' %
         #     (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']), logger = logger)
-        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss dif_loss rec_loss = %s lr = %.6f' %
+        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss dif_loss rec_loss center_loss axis_loss = %s lr = %.6f' %
             (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']))
 
         if epoch % args.val_freq == 0 and epoch != 0:
