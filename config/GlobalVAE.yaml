@@ -1,5 +1,5 @@
 optimizer : {
-  type: AdamW,
+  type: Adam,
   kwargs: {
   lr : 0.00001,
   weight_decay : 0.05
@@ -35,18 +35,24 @@ dataset : {
 
 model : {
   NAME: GlobalVAE,
-  z_dim: 1024, 
+  ddpm_dim: 3,
+  shapelatent_latent_dim: 1,
   latent_dim: 1024, 
-  PCN: {
-    num_dense: 512, 
-    latent_dim: 1024, 
-    grid_size: 4
-  }
+  sample_points: 16384,
+  style_dim: 128,
+  dropout: 0.1,
+  skip_weight: 0.01,
+  pts_sigma_offset: 0.0,
+  log_sigma_offset: 6.0,
+  depth: 12,
+  ada_mlp_init_scale: 0.1,
+  cond_on_cat: False,
 }
 
 
 npoints: 512
 total_bs : 64
+kl_weight: 0.5
 step_per_update : 1
 max_epoch : 300
 grad_norm_clip : 10

@@ -102,34 +102,11 @@ def test_global(args, config, logger):
             centers = centers.cuda().float()
             axis = axis.cuda().float()
             masks = masks.cuda()
-            mu, log_var, prediction = base_model(point,axis)
-            kl_loss = 0.001*(-0.5 * torch.sum(1 + log_var - mu**2 - log_var.exp()))
-
-            predicted_centers, normal1,normal2 = get_center_and_axis(prediction)
-            gt_normal1 = axis[:,:,3:6] 
-            gt_normal2 = axis[:,:,6:]
-            criterion1 = nn.MSELoss(reduction='none')
-            center_loss = 5000*(criterion1(predicted_centers,centers) * masks.unsqueeze(2)).mean()
-            criterion2 = nn.CosineEmbeddingLoss(reduction='none')
-            target = torch.ones(point.shape[0]).cuda()
-            axis_loss = torch.stack([criterion2(normal1[:,i],axis[:,i,3:6],target) + criterion2(normal2[:,i],axis[:,i,6:],target) for i in range(32)],dim=1)
-            axis_loss = 300*(axis_loss * masks).mean()
-            loss = kl_loss + axis_loss + center_loss
-
-            normal1 = nn.functional.normalize(normal1,dim=-1)
-            normal2 = nn.functional.normalize(normal2,dim=-1)
-            gt_normal1 = nn.functional.normalize(gt_normal1,dim=-1)
-            gt_normal2 = nn.functional.normalize(gt_normal2,dim=-1)
-            RR = align_axis(normal1,normal2,gt_normal1,gt_normal2)
-            original_point_cloud = rearrange(point,'b n p c -> (b n) p c')
-            after_cloud = original_point_cloud - rearrange(centers,'b n c -> (b n) c').unsqueeze(1)
-            after_cloud = torch.bmm(after_cloud,RR)
-            after_cloud = after_cloud + rearrange(predicted_centers,'b n c -> (b n) c').unsqueeze(1)
-            after_cloud = rearrange(after_cloud,'(b n) p c -> b (n p) c',n=32)
+            point = rearrange(point,'b n p c -> b (n p) c')
+            outputs, latent_list = base_model(point)
             idx = 0
             print(masks[idx])
-            write_pointcloud(after_cloud[idx].cpu().numpy(),'/data3/leics/dataset/test.ply')
-            np.save('/data3/leics/dataset/test.npy',torch.cat((predicted_centers[idx],normal1[idx],normal2[idx]),dim=-1).cpu().numpy())
+            write_pointcloud(outputs[idx].cpu().numpy(),'/data3/leics/dataset/test.ply')
             exit()
 
         logger.info('[TEST] Loss rec_loss kl_loss = %s' % (['%.4f' % l for l in losses.avg()]))

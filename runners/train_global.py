@@ -121,11 +121,11 @@ def train_global(args, config, train_writer, val_writer, logger):
         batch_start_time = time.time()
         batch_time = AverageMeter()
         data_time = AverageMeter()
-        losses = AverageMeter(['loss','kl_loss','center_loss','cd_loss','axis_loss'])
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
 
-        for idx, (index,point,centers,axis,masks) in enumerate(train_dataloader):      #TODO
+        for idx, (index,point,centers,axis,masks) in enumerate(train_dataloader): 
+            losses = AverageMeter(['loss','kl_loss','rec_loss'])
             optimizer.zero_grad()
             data_time.update(time.time() - batch_start_time)
 
@@ -134,56 +134,44 @@ def train_global(args, config, train_writer, val_writer, logger):
             centers = centers.cuda().float()
             axis = axis.cuda().float()
             masks = masks.cuda()
-            mu, log_var, prediction = base_model(point,axis)
-            kl_loss = 0.001*(-0.5 * torch.sum(1 + log_var - mu**2 - log_var.exp()))
+            # mu, log_var, prediction = base_model(point,axis)
+            point = rearrange(point,'b n p c -> b (n p) c')
+            outputs, latent_list = base_model(point)
+            batch_size = point.shape[0]
+            rec_loss = chamfer_distance(point,outputs,point_reduction='mean')[0]
+            # kl_term_list = []
+            weighted_kl_terms = []
+            for pairs_id, pairs in enumerate(latent_list):
+                cz, cmu, csigma = pairs 
+                log_sigma = csigma
+                kl_term_close = (0.5*log_sigma.exp()**2 + 
+                        0.5*cmu**2 - log_sigma - 0.5).view(point.shape[0],-1)
+                if pairs_id == 1:
+                    latent_shape = [batch_size, -1, base_model.module.latent_dim + base_model.module.input_dim] 
+                    kl_pt = kl_term_close.view(*latent_shape)[:,:,:base_model.module.input_dim] 
+                    kl_feat = kl_term_close.view(*latent_shape)[:,:,base_model.module.input_dim:] 
+                    weighted_kl_terms.append(kl_pt.sum(2).sum(1)) 
+                    weighted_kl_terms.append(kl_feat.sum(2).sum(1))  
+
+                elif pairs_id == 0:
+                    kl_style = kl_term_close  
+                    weighted_kl_terms.append(kl_style.sum(-1))
+            
+            kl_loss = 0.00005*sum(weighted_kl_terms).mean()
             # rec_loss = (torch.stack([chamfer_distance(point[:,i],reconstructed[:,i],batch_reduction=None)[0] for i in range(32)],dim=1) * masks).sum()
             # loss = kl_loss + rec_loss
-            predicted_centers, normal1,normal2 = get_center_and_axis(prediction)
-            gt_normal1 = axis[:,:,3:6] 
-            gt_normal2 = axis[:,:,6:]
-            criterion1 = nn.MSELoss(reduction='none')
-            center_loss = 5000*(criterion1(predicted_centers,centers) * masks.unsqueeze(2)).mean()
-            # print(predicted_centers)
-            criterion2 = nn.CosineEmbeddingLoss(reduction='none')
-            # axis_loss = torch.FloatTensor([0.]).to(device)
-            # for i in range(bs):
-            target = torch.ones(point.shape[0]).cuda()
-
-            # MSE loss
-            # axis_loss = torch.stack([criterion1(normal1[:,i],axis[:,i,3:6]) + criterion1(normal2[:,i],axis[:,i,6:]) for i in range(32)],dim=1)
-            # axis_loss = 10*(axis_loss * masks.unsqueeze(2)).mean()
-
-            # cosine embedding loss
-            axis_loss = torch.stack([criterion2(normal1[:,i],axis[:,i,3:6],target) + criterion2(normal2[:,i],axis[:,i,6:],target) for i in range(32)],dim=1)
-            axis_loss += (criterion1(normal1,axis[:,:,3:6]) + criterion1(normal2,axis[:,:,6:])).sum(dim=-1)
-            axis_loss = 100*(axis_loss * masks).mean()
-
-            normal1 = nn.functional.normalize(normal1,dim=-1)
-            normal2 = nn.functional.normalize(normal2,dim=-1)
-            gt_normal1 = nn.functional.normalize(gt_normal1,dim=-1)
-            gt_normal2 = nn.functional.normalize(gt_normal2,dim=-1)
-            RR = align_axis(normal1,normal2,gt_normal1,gt_normal2,masks<1)
-
-            original_point_cloud = rearrange(point,'b n p c -> (b n) p c')
-            after_cloud = original_point_cloud - rearrange(centers,'b n c -> (b n) c').unsqueeze(1)
-            after_cloud = torch.bmm(after_cloud,RR)
-            after_cloud = after_cloud + rearrange(predicted_centers,'b n c -> (b n) c').unsqueeze(1)
-            # cd_loss, _ = chamfer_distance(original_point_cloud,after_cloud,batch_reduction=None)
-            # cd_loss = 1000*(cd_loss * masks.view(-1,1)).mean()
-            cd_loss = (criterion1(original_point_cloud,after_cloud).sum(dim=(1,2)) * masks.view(-1,1)).mean()
-            # cd_loss = torch.FloatTensor([0.]).cuda()
-            loss = kl_loss + cd_loss + center_loss + axis_loss
+            loss = kl_loss + rec_loss
             #######
 
             loss.backward()
             optimizer.step()
-            losses.update([loss.item(),kl_loss.item(),center_loss.item(),cd_loss.item(),axis_loss.item()])
+            losses.update([loss.item(),kl_loss.item(),rec_loss.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
             
             if idx % 5 == 0:
-                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss kl_loss center_loss cd_loss axis_loss = %s lr = %.6f' %
+                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss kl_loss rec_loss = %s lr = %.6f' %
                             (epoch, config.max_epoch, idx + 1, n_batches, batch_time.val(), data_time.val(),
                             ['%.4f' % l for l in losses.val()], optimizer.param_groups[0]['lr']))
         if isinstance(scheduler, list):
@@ -198,7 +186,7 @@ def train_global(args, config, train_writer, val_writer, logger):
 
         # print_log('[Training] EPOCH: %d EpochTime = %.3f (s) Losses = %s lr = %.6f' %
         #     (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']), logger = logger)
-        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss kl_loss center_loss cd_loss axis_loss = %s lr = %.6f' %
+        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss kl_loss rec_loss = %s lr = %.6f' %
             (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']))
 
         if epoch % args.val_freq == 0 and epoch != 0:
@@ -221,7 +209,7 @@ def train_global(args, config, train_writer, val_writer, logger):
 def validate(base_model, test_dataloader, epoch, val_writer, args, config, logger = None):
     logger.info(f"[VALIDATION] Start validating epoch {epoch}")
     base_model.eval()  # set model to eval mode
-    losses = AverageMeter(['loss','kl_loss','center_loss','axis_loss'])
+    losses = AverageMeter(['loss','kl_loss','rec_loss'])
     with torch.no_grad():
         for idx, (index,point,centers,axis,masks) in enumerate(test_dataloader):
             point = point.cuda().float()
@@ -229,28 +217,25 @@ def validate(base_model, test_dataloader, epoch, val_writer, args, config, logge
             axis = axis.cuda().float()
             masks = masks.cuda()
             # attn_mask = create_attn_mask(masks)
-            mu, log_var, prediction = base_model(point,axis)
-            kl_loss = 0.001*(-0.5 * torch.sum(1 + log_var - mu**2 - log_var.exp()))
+            point = rearrange(point,'b n p c -> b (n p) c')
+            outputs, latent_list = base_model(point)
+            
+            rec_loss = chamfer_distance(point,outputs,point_reduction='sum')[0]
+            kl_term_list = []
+            for pairs_id, pairs in enumerate(latent_list):
+                cz, cmu, csigma = pairs 
+                log_sigma = csigma
+                kl_term_close = (0.5*log_sigma.exp()**2 + 
+                        0.5*cmu**2 - log_sigma - 0.5).sum(-1)
+                kl_term_list.append(kl_term_close)
+            
+            kl_loss = 0.005*sum(kl_term_list).mean()
             # rec_loss = (torch.stack([chamfer_distance(point[:,i],reconstructed[:,i],batch_reduction=None)[0] for i in range(32)],dim=1) * masks).sum()
             # loss = kl_loss + rec_loss
-            predicted_centers, normal1,normal2 = get_center_and_axis(prediction)
-            gt_normal1 = axis[:,:,3:6] 
-            gt_normal2 = axis[:,:,6:]
-            criterion1 = nn.MSELoss(reduction='none')
-            center_loss = 5000*(criterion1(predicted_centers,centers) * masks.unsqueeze(2)).mean()
-            # print(predicted_centers)
-            criterion2 = nn.CosineEmbeddingLoss(reduction='none')
-            # axis_loss = torch.FloatTensor([0.]).to(device)
-            # for i in range(bs):
-            target = torch.ones(point.shape[0]).cuda()
-                # axis_loss += (criterion2(normal1[i],axis[i,:,3:6],target) + criterion2(normal2[i],axis[i,:,6:],target)).mean()
-            axis_loss = torch.stack([criterion2(normal1[:,i],axis[:,i,3:6],target) + criterion2(normal2[:,i],axis[:,i,6:],target) for i in range(32)],dim=1)
-            axis_loss = 100*(axis_loss * masks).mean()
-            # axis_loss = 100 * axis_loss.mean()
-            loss = kl_loss + axis_loss + center_loss
-            losses.update([loss.item(),kl_loss.item(),center_loss.item(),axis_loss.item()])
+            loss = kl_loss + rec_loss
+            losses.update([loss.item(),kl_loss.item(),rec_loss.item()])
 
-        logger.info('[Validation] EPOCH: %d  Loss kl_loss center_loss axis_loss = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
+        logger.info('[Validation] EPOCH: %d  Loss kl_loss rec_loss = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
 
 
     # Add testing results to TensorBoard

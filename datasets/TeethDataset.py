@@ -29,6 +29,7 @@ class teethDataset(data.Dataset):
     def __init__(self, config):
         super().__init__()
         self.train = config.train
+        self.sample_num = config.sample_num
         with open(config.file) as f:
             self.mesh_paths = [l.strip() for l in f.readlines()]
 
@@ -39,7 +40,10 @@ class teethDataset(data.Dataset):
         path = self.mesh_paths[idx]
         name = path.split('/')[-1]
         label = int(name.split('.')[0].split('_')[1])
-        points = read_pointcloud(path)
+        pts = read_pointcloud(path)
+        points = pts[:self.sample_num]
+        centroid = pts[self.sample_num]
+        points = points - centroid
         if self.train:
             points = randomize_orientation(points)
-        return   points,label
+        return   points,centroid,label

@@ -1,1 +1,0 @@
-/data3/leics/dataset/teeth_full/single_normed_before_pointcloud513/395_24.ply
