@@ -1,6 +1,6 @@
 ENT="python second_stage.py "
-cfg="config/vqvae.yaml"
-ckpts="/data3/leics/dataset/checkpoints/vqvae/vqvae3/ckpt-best.pth"
+cfg="config/ae.yaml"
+ckpts="/data3/leics/dataset/checkpoints/vqvae/fsqae/ckpt-best.pth"
 saveroot="/data3/leics/dataset/checkpoints/global"
 exp_name="vqvae"
 launcher="none"
