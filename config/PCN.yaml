@@ -1,7 +1,7 @@
 optimizer : {
   type: AdamW,
   kwargs: {
-  lr : 0.0005,
+  lr : 0.0001,
   weight_decay : 0.05
 }}
 
@@ -15,18 +15,21 @@ scheduler: {
 dataset : {
   train : { NAME: teethDataset,
             train: True,
+            sample_num: 512,
             file: files/first_stage/train.txt},
   val : { NAME: teethDataset,
           train: False,
+          sample_num: 512,
           file: files/first_stage/test.txt},
   test : {  NAME: teethDataset,
             train: False,
+            sample_num: 512,
             file: files/first_stage/test.txt}}
 
 model : {
   NAME: PCN,
   num_dense: 512, 
-  latent_dim: 256, 
+  latent_dim: 512, 
   grid_size: 4
 }
 

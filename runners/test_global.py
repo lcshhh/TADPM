@@ -102,10 +102,17 @@ def test_global(args, config, logger):
             centers = centers.cuda().float()
             axis = axis.cuda().float()
             masks = masks.cuda()
-            point = rearrange(point,'b n p c -> b (n p) c')
-            outputs, latent_list = base_model(point)
-            idx = 0
-            print(masks[idx])
+            # attn_mask = create_attn_mask(masks)
+            embedding_loss,outputs = base_model(point,masks)
+            embedding_loss = embedding_loss.mean()
+            batch_size = point.shape[0]
+            chamfer_losses = []
+            rec_loss = torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
+            rec_loss = (rec_loss * masks).mean()
+            loss = embedding_loss + rec_loss
+            losses.update([loss.item(),embedding_loss.item(),rec_loss.item()])
+            print(rec_loss)
+            outputs = rearrange(outputs,'b n p c -> b (n p) c')
             write_pointcloud(outputs[idx].cpu().numpy(),'/data3/leics/dataset/test.ply')
             exit()
 

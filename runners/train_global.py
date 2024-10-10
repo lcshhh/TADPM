@@ -7,6 +7,7 @@ from utils.logger import *
 from utils.AverageMeter import AverageMeter
 from pytorch3d.loss import chamfer_distance
 from einops import rearrange
+from torch import autograd
 
 import numpy as np
 from torchvision import transforms
@@ -123,9 +124,9 @@ def train_global(args, config, train_writer, val_writer, logger):
         data_time = AverageMeter()
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
-
+        losses = AverageMeter(['loss','embedding_loss','rec_loss'])
+        # validate(base_model, test_dataloader, epoch, val_writer, args, config, logger=logger)
         for idx, (index,point,centers,axis,masks) in enumerate(train_dataloader): 
-            losses = AverageMeter(['loss','kl_loss','rec_loss'])
             optimizer.zero_grad()
             data_time.update(time.time() - batch_start_time)
 
@@ -135,43 +136,23 @@ def train_global(args, config, train_writer, val_writer, logger):
             axis = axis.cuda().float()
             masks = masks.cuda()
             # mu, log_var, prediction = base_model(point,axis)
-            point = rearrange(point,'b n p c -> b (n p) c')
-            outputs, latent_list = base_model(point)
-            batch_size = point.shape[0]
-            rec_loss = chamfer_distance(point,outputs,point_reduction='mean')[0]
-            # kl_term_list = []
-            weighted_kl_terms = []
-            for pairs_id, pairs in enumerate(latent_list):
-                cz, cmu, csigma = pairs 
-                log_sigma = csigma
-                kl_term_close = (0.5*log_sigma.exp()**2 + 
-                        0.5*cmu**2 - log_sigma - 0.5).view(point.shape[0],-1)
-                if pairs_id == 1:
-                    latent_shape = [batch_size, -1, base_model.module.latent_dim + base_model.module.input_dim] 
-                    kl_pt = kl_term_close.view(*latent_shape)[:,:,:base_model.module.input_dim] 
-                    kl_feat = kl_term_close.view(*latent_shape)[:,:,base_model.module.input_dim:] 
-                    weighted_kl_terms.append(kl_pt.sum(2).sum(1)) 
-                    weighted_kl_terms.append(kl_feat.sum(2).sum(1))  
-
-                elif pairs_id == 0:
-                    kl_style = kl_term_close  
-                    weighted_kl_terms.append(kl_style.sum(-1))
-            
-            kl_loss = 0.00005*sum(weighted_kl_terms).mean()
-            # rec_loss = (torch.stack([chamfer_distance(point[:,i],reconstructed[:,i],batch_reduction=None)[0] for i in range(32)],dim=1) * masks).sum()
-            # loss = kl_loss + rec_loss
-            loss = kl_loss + rec_loss
+            # point = rearrange(point,'b n p c -> b (n p) c')
+            embedding_loss,outputs = base_model(point,masks)
+            embedding_loss = embedding_loss.mean()
+            rec_loss = 10*torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
+            rec_loss = (rec_loss * masks).mean()
+            loss = embedding_loss + rec_loss
             #######
-
-            loss.backward()
+            with autograd.detect_anomaly():
+                loss.backward()
             optimizer.step()
-            losses.update([loss.item(),kl_loss.item(),rec_loss.item()])
+            losses.update([loss.item(),embedding_loss.item(),rec_loss.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
             
             if idx % 5 == 0:
-                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss kl_loss rec_loss = %s lr = %.6f' %
+                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss embed_loss rec_loss = %s lr = %.6f' %
                             (epoch, config.max_epoch, idx + 1, n_batches, batch_time.val(), data_time.val(),
                             ['%.4f' % l for l in losses.val()], optimizer.param_groups[0]['lr']))
         if isinstance(scheduler, list):
@@ -217,25 +198,14 @@ def validate(base_model, test_dataloader, epoch, val_writer, args, config, logge
             axis = axis.cuda().float()
             masks = masks.cuda()
             # attn_mask = create_attn_mask(masks)
-            point = rearrange(point,'b n p c -> b (n p) c')
-            outputs, latent_list = base_model(point)
-            
-            rec_loss = chamfer_distance(point,outputs,point_reduction='sum')[0]
-            kl_term_list = []
-            for pairs_id, pairs in enumerate(latent_list):
-                cz, cmu, csigma = pairs 
-                log_sigma = csigma
-                kl_term_close = (0.5*log_sigma.exp()**2 + 
-                        0.5*cmu**2 - log_sigma - 0.5).sum(-1)
-                kl_term_list.append(kl_term_close)
-            
-            kl_loss = 0.005*sum(kl_term_list).mean()
-            # rec_loss = (torch.stack([chamfer_distance(point[:,i],reconstructed[:,i],batch_reduction=None)[0] for i in range(32)],dim=1) * masks).sum()
-            # loss = kl_loss + rec_loss
-            loss = kl_loss + rec_loss
-            losses.update([loss.item(),kl_loss.item(),rec_loss.item()])
+            embedding_loss,outputs = base_model(point,masks)
+            embedding_loss = embedding_loss.mean()
+            rec_loss = torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
+            rec_loss = (rec_loss * masks).mean()
+            loss = embedding_loss + rec_loss
+            losses.update([loss.item(),embedding_loss.item(),rec_loss.item()])
 
-        logger.info('[Validation] EPOCH: %d  Loss kl_loss rec_loss = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
+        logger.info('[Validation] EPOCH: %d  Loss embed_loss rec_loss = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
 
 
     # Add testing results to TensorBoard

@@ -39,7 +39,7 @@ class FullTeethDataset(data.Dataset):
     
     def __getitem__(self, idx):
         point_num = self.npoint
-        after_points = np.zeros((32,point_num,3))
+        after_points = np.random.random((32,point_num,3))/1000
         after_centroid = np.zeros((32,3))
         index = self.indexes[idx]
         masks = np.zeros((32),dtype=np.int32)
@@ -52,12 +52,12 @@ class FullTeethDataset(data.Dataset):
                 after = read_pointcloud(after_path)
                 after_points[i] = after[:point_num]
                 after_centroid[i] = after[point_num] 
-                if self.train and np.random.rand() < 0.3:
-                    rotation, translation = randomize_mesh_orientation()
-                    after_points[i] = rotation.apply(after_points[i] - np.expand_dims(after_centroid[i],0)) + np.expand_dims(after_centroid[i] + translation,0)
-                    after_centroid[i] = after_centroid[i] + translation
-                    axis[i][3:6] = rotation.apply(axis[i][3:6])
-                    axis[i][6:] = rotation.apply(axis[i][6:])
+                # if self.train and np.random.rand() < 0.3:
+                #     rotation, translation = randomize_mesh_orientation()
+                #     after_points[i] = rotation.apply(after_points[i] - np.expand_dims(after_centroid[i],0)) + np.expand_dims(after_centroid[i] + translation,0)
+                #     after_centroid[i] = after_centroid[i] + translation
+                #     axis[i][3:6] = rotation.apply(axis[i][3:6])
+                #     axis[i][6:] = rotation.apply(axis[i][6:])
         return   index,after_points,after_centroid,axis,masks
 
 

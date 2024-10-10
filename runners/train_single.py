@@ -26,7 +26,8 @@ def train_single(args, config, train_writer, val_writer, logger):
         # best_metrics = Acc_Metric(best_metrics)
     else:
         if args.ckpts != '':
-            base_model.load_model_from_ckpt(args.ckpts)
+            checkpoints = torch.load(args.ckpts)
+            base_model.load_state_dict(checkpoints['base_model'])
         else:
             logger.info('Training from scratch')
  
@@ -49,46 +50,29 @@ def train_single(args, config, train_writer, val_writer, logger):
         batch_start_time = time.time()
         batch_time = AverageMeter()
         data_time = AverageMeter()
-        losses = AverageMeter(['loss','kl_loss','rec_loss'])
+        # losses = AverageMeter(['loss','rec_loss'])
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
 
         for idx, (point,centroid,label) in enumerate(train_dataloader):
-            losses = AverageMeter(['loss','kl_loss','rec_loss'])
+            losses = AverageMeter(['loss'])
             optimizer.zero_grad()
             data_time.update(time.time() - batch_start_time)
 
             #####TODO
             point = point.cuda().float()
             centroid = centroid.cuda().float()
+            point = point + centroid.unsqueeze(1)
 
-            outputs, latent_list = base_model(point)
+            outputs = base_model(point)
             batch_size = point.shape[0]
             rec_loss = chamfer_distance(point,outputs,point_reduction='sum')[0]
-            weighted_kl_terms = []
-            for pairs_id, pairs in enumerate(latent_list):
-                cz, cmu, csigma = pairs 
-                log_sigma = csigma
-                kl_term_close = (0.5*log_sigma.exp()**2 + 
-                        0.5*cmu**2 - log_sigma - 0.5).view(point.shape[0],-1)
-                if pairs_id == 1:
-                    latent_shape = [batch_size, -1, base_model.module.latent_dim + base_model.module.input_dim] 
-                    kl_pt = kl_term_close.view(*latent_shape)[:,:,:base_model.module.input_dim] 
-                    kl_feat = kl_term_close.view(*latent_shape)[:,:,base_model.module.input_dim:] 
-                    weighted_kl_terms.append(kl_pt.sum(2).sum(1)) 
-                    weighted_kl_terms.append(kl_feat.sum(2).sum(1))  
-
-                elif pairs_id == 0:
-                    kl_style = kl_term_close  
-                    weighted_kl_terms.append(kl_style.sum(-1))
-            
-            kl_loss = 0.00005*sum(weighted_kl_terms).mean()
-            loss = kl_loss + rec_loss
+            loss = rec_loss
             #######
 
             loss.backward()
             optimizer.step()
-            losses.update([loss.item(),kl_loss.item(),rec_loss.item()])
+            losses.update([loss.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
@@ -98,7 +82,7 @@ def train_single(args, config, train_writer, val_writer, logger):
             batch_start_time = time.time()
             
             if idx % 100 == 0:
-                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss, kl, rec = %s lr = %.6f' %
+                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss, rec = %s lr = %.6f' %
                             (epoch, config.max_epoch, idx + 1, n_batches, batch_time.val(), data_time.val(),
                             ['%.4f' % l for l in losses.val()], optimizer.param_groups[0]['lr']))
         if isinstance(scheduler, list):
@@ -113,7 +97,7 @@ def train_single(args, config, train_writer, val_writer, logger):
 
         # print_log('[Training] EPOCH: %d EpochTime = %.3f (s) Losses = %s lr = %.6f' %
         #     (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']), logger = logger)
-        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss, kl, rec = %s lr = %.6f' %
+        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss, rec = %s lr = %.6f' %
             (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']))
 
         if epoch % args.val_freq == 0 and epoch != 0:
@@ -138,37 +122,19 @@ def train_single(args, config, train_writer, val_writer, logger):
 def validate(base_model, test_dataloader, epoch, val_writer, args, config, logger = None):
     logger.info(f"[VALIDATION] Start validating epoch {epoch}")
     base_model.eval()  # set model to eval mode
-    losses = AverageMeter(['loss','kl_loss','rec_loss'])
+    losses = AverageMeter(['loss'])
     with torch.no_grad():
         for idx, (point,centroid, label) in enumerate(test_dataloader):
             point = point.cuda().float()
             centroid = centroid.cuda().float()
-
-            outputs, latent_list = base_model(point)
+            point = point + centroid.unsqueeze(1)
+            outputs = base_model(point)
             batch_size = point.shape[0]
             rec_loss = chamfer_distance(point,outputs,point_reduction='sum')[0]
-            weighted_kl_terms = []
-            for pairs_id, pairs in enumerate(latent_list):
-                cz, cmu, csigma = pairs 
-                log_sigma = csigma
-                kl_term_close = (0.5*log_sigma.exp()**2 + 
-                        0.5*cmu**2 - log_sigma - 0.5).view(point.shape[0],-1)
-                if pairs_id == 1:
-                    latent_shape = [batch_size, -1, base_model.module.latent_dim + base_model.module.input_dim] 
-                    kl_pt = kl_term_close.view(*latent_shape)[:,:,:base_model.module.input_dim] 
-                    kl_feat = kl_term_close.view(*latent_shape)[:,:,base_model.module.input_dim:] 
-                    weighted_kl_terms.append(kl_pt.sum(2).sum(1)) 
-                    weighted_kl_terms.append(kl_feat.sum(2).sum(1))  
+            loss = rec_loss
+            losses.update([loss.item()])
 
-                elif pairs_id == 0:
-                    kl_style = kl_term_close  
-                    weighted_kl_terms.append(kl_style.sum(-1))
-            
-            kl_loss = 0.00005*sum(weighted_kl_terms).mean()
-            loss = kl_loss + rec_loss
-            losses.update([loss.item(),kl_loss.item(),rec_loss.item()])
-
-        logger.info('[Validation] EPOCH: %d  Loss, kl, rec = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
+        logger.info('[Validation] EPOCH: %d  Loss= %s' % (epoch,['%.4f' % l for l in losses.avg()]))
 
 
     # Add testing results to TensorBoard

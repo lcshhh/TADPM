@@ -1,7 +1,7 @@
 ENT="python first_stage.py "
 cfg="config/PCN.yaml"
 saveroot="/data3/leics/dataset/teeth_full/single_checkpoints"
-ckpts="/data3/leics/dataset/teeth_full/single_checkpoints/PCN/ckpt-best.pth"
+ckpts="/data3/leics/dataset/teeth_full/single_checkpoints/PCN2_512/ckpt-best.pth"
 exp_name="PCN"
 launcher="none"
 

@@ -1,7 +1,8 @@
 ENT="python first_stage.py "
-cfg="config/single_PVCNN.yaml"
+cfg="config/PCN.yaml"
 saveroot="/data3/leics/dataset/teeth_full/single_checkpoints"
-exp_name="PVCNN"
+ckpts="/data3/leics/dataset/teeth_full/single_checkpoints/PCN512/ckpt-best.pth"
+exp_name="PCN2_512"
 launcher="none"
 
 
@@ -9,5 +10,6 @@ launcher="none"
 $ENT --config $cfg \
     --launcher $launcher \
     --save_root $saveroot \
-    --exp_name $exp_name
+    --exp_name $exp_name \
+    --ckpts $ckpts
 

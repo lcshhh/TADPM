@@ -29,10 +29,15 @@ def test_single(args, config, logger):
     base_model.eval()  # set model to eval mode
     losses = AverageMeter(['loss'])
     with torch.no_grad():
-        for idx, (point, label) in enumerate(test_dataloader):
+        for idx, (point, centroid,label) in enumerate(test_dataloader):
             point = point.cuda().to(torch.float32)
+            centroid = centroid.cuda().to(torch.float32)
+            point = point + centroid.unsqueeze(1)
             fine = base_model(point)
-            loss = 1000*chamfer_distance(point,fine,point_reduction='mean')[0]
+            loss = chamfer_distance(point,fine,point_reduction='sum')[0]
+            from einops import rearrange
+            # fine = rearrange(fine,'b p c -> (b p) c')
+            write_pointcloud(fine[0].cpu().numpy(),'/data3/leics/dataset/test_single.ply')
             losses.update([loss.item()])
 
         logger.info('[Test] loss = %s' % (['%.4f' % l for l in losses.avg()]))
