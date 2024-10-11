@@ -35,6 +35,15 @@ dataset : {
 
 model : {
   NAME: VoxelUNet,
+   local_encoder: {
+    zdim: 512,
+    num_dense: 512,
+    latent_dim: 512, 
+    input_dim: 3,
+    n_head: 8,
+    grid_size: 4,
+    depth: 12
+  },
 }
 
 

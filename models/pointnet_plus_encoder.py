@@ -59,7 +59,8 @@ class PointNetPlusEncoder(nn.Module):
 class PointNetEncoder(nn.Module):
     sa_blocks = [
         [[32, 2, 32], [1024, 0.1, 32, [32, 32]]],
-        [[32, 1, 16], [256, 0.2, 32, [32, 64]]]
+        [[32, 1, 16], [256, 0.2, 32, [32, 64]]],
+        [[32, 1, 8], [64, 0.4, 32, [64, 128]]]
         ]
     force_att = 0 # add attention to all layers  
     # def __init__(self, zdim, input_dim, extra_feature_channels=0, args={}):
@@ -117,9 +118,9 @@ class PointNetEncoder(nn.Module):
         for layer_id, layer in enumerate(self.layers):
             features, xyz, _ = layer( (features, xyz, None) )
         # features: B,D,N; xyz: B,3,N
-       
-        features = features.max(-1)[0]
-        features = self.mlp(features)
+
+        # features = features.max(-1)[0]
+        # features = self.mlp(features)
         return features
 
     def decode(self,features):

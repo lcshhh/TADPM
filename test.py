@@ -23,8 +23,8 @@ from models import UNet3D
 # points = trimesh.sample.volume_mesh(mesh,8192)
 # write_pointcloud(points,'/data3/leics/dataset/sample.ply')
 # print(points.shape)
-
+from models.pointnet_plus_encoder import PointNetEncoder
 x = torch.randn((32,3,20,20,20),dtype=torch.float32).cuda()
-model = UNet3D(3,20).cuda()
+model = PointNetEncoder()
 output = model(x)
 print(output.shape)
