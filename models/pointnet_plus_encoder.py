@@ -74,7 +74,6 @@ class PointNetEncoder(nn.Module):
             use_att=True, with_se=True)
         self.mlp = nn.Linear(channels_sa_features, config.zdim) 
         self.zdim = config.zdim 
-        # logger.info('[Encoder] zdim={}, out_sigma={}; force_att: {}', config.zdim, True, self.force_att) 
         self.layers = nn.ModuleList(layers) 
         self.voxel_dim = [n[1][-1][-1] for n in self.sa_blocks]
 
@@ -118,7 +117,6 @@ class PointNetEncoder(nn.Module):
         for layer_id, layer in enumerate(self.layers):
             features, xyz, _ = layer( (features, xyz, None) )
         # features: B,D,N; xyz: B,3,N
-
         # features = features.max(-1)[0]
         # features = self.mlp(features)
         return features

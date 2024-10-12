@@ -23,8 +23,30 @@ from models import UNet3D
 # points = trimesh.sample.volume_mesh(mesh,8192)
 # write_pointcloud(points,'/data3/leics/dataset/sample.ply')
 # print(points.shape)
-from models.pointnet_plus_encoder import PointNetEncoder
-x = torch.randn((32,3,20,20,20),dtype=torch.float32).cuda()
-model = PointNetEncoder()
-output = model(x)
-print(output.shape)
+# from models.pointnet_plus_encoder import PointNetEncoder
+# x = torch.randn((32,3,20,20,20),dtype=torch.float32).cuda()
+# model = PointNetEncoder()
+# output = model(x)
+# print(output.shape)
+
+import torch
+from vector_quantize_pytorch import LFQ
+
+quantizer = LFQ(
+    codebook_size = 65536,
+    dim = 16,
+    entropy_loss_weight = 0.1,
+    diversity_gamma = 1.,
+    experimental_softplus_entropy_loss=True
+)
+
+seq = torch.randn(1, 32, 16)
+quantized, indices, loss = quantizer(seq)
+print(loss)
+
+assert seq.shape == quantized.shape
+
+video_feats = torch.randn(1, 16, 10, 32, 32)
+quantized, indices, loss= quantizer(video_feats)
+print(loss)
+assert video_feats.shape == quantized.shape

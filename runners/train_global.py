@@ -124,7 +124,7 @@ def train_global(args, config, train_writer, val_writer, logger):
         data_time = AverageMeter()
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
-        losses = AverageMeter(['loss','rec_loss'])
+        losses = AverageMeter(['loss','rec_loss','ent_loss'])
         # validate(base_model, test_dataloader, epoch, val_writer, args, config, logger=logger)
         for idx, (index,point,centers,axis,masks) in enumerate(train_dataloader): 
             optimizer.zero_grad()
@@ -135,22 +135,23 @@ def train_global(args, config, train_writer, val_writer, logger):
             centers = centers.cuda().float()
             axis = axis.cuda().float()
             masks = masks.cuda()
-            outputs = base_model(point)
+            outputs,entropy_loss = base_model(point)
+            entropy_loss = entropy_loss.mean()
             rec_loss = 10*torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
             # rec_loss = 10*(outputs-point).abs().mean()
             rec_loss = (rec_loss * masks).mean()
-            loss = rec_loss
+            loss = rec_loss + entropy_loss
             #######
             with autograd.detect_anomaly():
                 loss.backward()
             optimizer.step()
-            losses.update([loss.item(),rec_loss.item()])
+            losses.update([loss.item(),rec_loss.item(),entropy_loss.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
             
             if idx % 5 == 0:
-                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss embed_loss rec_loss = %s lr = %.6f' %
+                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss embed_loss rec_loss ent_loss = %s lr = %.6f' %
                             (epoch, config.max_epoch, idx + 1, n_batches, batch_time.val(), data_time.val(),
                             ['%.4f' % l for l in losses.val()], optimizer.param_groups[0]['lr']))
         if isinstance(scheduler, list):
@@ -165,7 +166,7 @@ def train_global(args, config, train_writer, val_writer, logger):
 
         # print_log('[Training] EPOCH: %d EpochTime = %.3f (s) Losses = %s lr = %.6f' %
         #     (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']), logger = logger)
-        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss kl_loss rec_loss = %s lr = %.6f' %
+        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss kl_loss rec_loss ent_loss = %s lr = %.6f' %
             (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']))
 
         if epoch % args.val_freq == 0 and epoch != 0:
@@ -196,7 +197,7 @@ def validate(base_model, test_dataloader, epoch, val_writer, args, config, logge
             axis = axis.cuda().float()
             masks = masks.cuda()
             # attn_mask = create_attn_mask(masks)
-            outputs = base_model(point)
+            outputs, *_ = base_model(point)
             rec_loss = torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
             rec_loss = (rec_loss * masks).mean()
             loss = rec_loss

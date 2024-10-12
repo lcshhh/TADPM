@@ -1,7 +1,7 @@
 optimizer : {
   type: AdamW,
   kwargs: {
-  lr : 0.0001,
+  lr : 0.001,
   weight_decay : 0.05
 }}
 
@@ -16,20 +16,20 @@ dataset : {
   train : { NAME: FullTeethDataset,
             train: True,
             file: files/second_stage/train.txt,
-            after_path: /data3/leics/dataset/type2/pointcloud512_after,
+            after_path: /data3/leics/dataset/type2/single_after_inside512,
             axis_path: /data3/leics/dataset/type2/single_after_axis,
             npoint: 512
             },
   val : { NAME: FullTeethDataset,
           train: False,
           file: files/second_stage/test.txt,
-          after_path: /data3/leics/dataset/type2/pointcloud512_after,
+          after_path: /data3/leics/dataset/type2/single_after_inside512,
             axis_path: /data3/leics/dataset/type2/single_after_axis,
           npoint: 512},
   test : {  NAME: FullTeethDataset,
             train: False,
             file: files/second_stage/test.txt,
-            after_path: /data3/leics/dataset/type2/pointcloud512_after,
+            after_path: /data3/leics/dataset/type2/single_after_inside512,
             axis_path: /data3/leics/dataset/type2/single_after_axis,
             npoint: 512}}
 
