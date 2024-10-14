@@ -175,16 +175,61 @@ class DoubleConv(nn.Sequential):
         self.add_module('SingleConv2',
                         SingleConv(conv2_in_channels, conv2_out_channels, kernel_size, order, num_groups,
                                    padding=padding, dropout_prob=dropout_prob2, is3d=is3d))
+        
+
+def nonlinearity(x):
+    # swish
+    return x*torch.sigmoid(x)
+
+class DiffusionConvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=3, order='cge', num_groups=8, is3d=True, **kwargs):
+        super(DiffusionConvBlock, self).__init__()
+
+        if in_channels != out_channels:
+            # conv1x1 for increasing the number of channels
+            if is3d:
+                self.conv1 = nn.Conv3d(in_channels, out_channels, 1)
+            else:
+                self.conv1 = nn.Conv2d(in_channels, out_channels, 1)
+        else:
+            self.conv1 = nn.Identity()
+
+        # residual block
+        self.conv2 = SingleConv(out_channels, out_channels, kernel_size=kernel_size, order=order, num_groups=num_groups,
+                                is3d=is3d)
+        # remove non-linearity from the 3rd convolution since it's going to be applied after adding the residual
+        n_order = order
+        for c in 'rel':
+            n_order = n_order.replace(c, '')
+        self.conv3 = SingleConv(out_channels, out_channels, kernel_size=kernel_size, order=n_order,
+                                num_groups=num_groups, is3d=is3d)
+        self.temb_proj = torch.nn.Linear(128,
+                                         out_channels)
+        # create non-linearity separately
+        if 'l' in order:
+            self.non_linearity = nn.LeakyReLU(negative_slope=0.1, inplace=True)
+        elif 'e' in order:
+            self.non_linearity = nn.ELU(inplace=True)
+        else:
+            self.non_linearity = nn.ReLU(inplace=True)
+
+    def forward(self, x, temb=None):
+        # apply first convolution to bring the number of channels to out_channels
+        residual = self.conv1(x)
+
+        # residual block
+        out = self.conv2(residual)
+        out = out + self.temb_proj(nonlinearity(temb))[:, :, None, None, None]
+
+        out = self.conv3(out)
+
+        out += residual
+        out = self.non_linearity(out)
+
+        return out
 
 
 class ResNetBlock(nn.Module):
-    """
-    Residual block that can be used instead of standard DoubleConv in the Encoder module.
-    Motivated by: https://arxiv.org/pdf/1706.00120.pdf
-
-    Notice we use ELU instead of ReLU (order='cge') and put non-linearity after the groupnorm.
-    """
-
     def __init__(self, in_channels, out_channels, kernel_size=3, order='cge', num_groups=8, is3d=True, **kwargs):
         super(ResNetBlock, self).__init__()
 
@@ -215,7 +260,7 @@ class ResNetBlock(nn.Module):
         else:
             self.non_linearity = nn.ReLU(inplace=True)
 
-    def forward(self, x):
+    def forward(self, x, temb=None):
         # apply first convolution to bring the number of channels to out_channels
         residual = self.conv1(x)
 
@@ -242,11 +287,10 @@ class ResNetBlockSE(ResNetBlock):
         elif se_module == 'sse':
             self.se_module = SpatialSELayer3D(num_channels=out_channels)
 
-    def forward(self, x):
+    def forward(self, x, temb=None):
         out = super().forward(x)
         out = self.se_module(out)
         return out
-
 
 class Encoder(nn.Module):
     """
@@ -302,10 +346,10 @@ class Encoder(nn.Module):
                                          dropout_prob=dropout_prob,
                                          is3d=is3d)
 
-    def forward(self, x):
+    def forward(self, x, temb=None):
         if self.pooling is not None:
             x = self.pooling(x)
-        x = self.basic_module(x)
+        x = self.basic_module(x, temb)
         return x
 
 
@@ -352,7 +396,7 @@ class Decoder(nn.Module):
                     upsample = 'nearest'  # use nearest neighbor interpolation for upsampling
                     concat = True  # use concat joining
                     adapt_channels = False  # don't adapt channels
-                elif basic_module == ResNetBlock or basic_module == ResNetBlockSE:
+                elif basic_module == ResNetBlock or basic_module == ResNetBlockSE or basic_module == DiffusionConvBlock:
                     upsample = 'deconv'  # use deconvolution upsampling
                     concat = False  # use summation joining
                     adapt_channels = True  # adapt channels after joining
@@ -386,10 +430,10 @@ class Decoder(nn.Module):
                                          dropout_prob=dropout_prob,
                                          is3d=is3d)
 
-    def forward(self, encoder_features, x):
+    def forward(self, encoder_features, x, temb=None):
         x = self.upsampling(encoder_features=encoder_features, x=x)
         x = self.joining(encoder_features, x)
-        x = self.basic_module(x)
+        x = self.basic_module(x,temb)
         return x
 
     @staticmethod

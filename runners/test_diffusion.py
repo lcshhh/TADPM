@@ -190,59 +190,21 @@ def test_diffusion(args, config, logger):
     logger.info(f"[TEST] Start test")
     base_model.eval()  # set model to eval mode
 
-    losses = AverageMeter(['loss','rec','kl'])
+    losses = AverageMeter(['loss'])
     with torch.no_grad():
-        for idx, (index,before_points,before_centers,before_axis,after_points,after_centers,after_axis,masks) in enumerate(test_dataloader):
-            bs = before_axis.shape[0]
-            before_points = before_points.cuda().float()
-            before_centers = before_centers.cuda().float()
-            after_points = after_points.cuda().float()
-            after_centers = after_centers.cuda().float()
-            before_axis = before_axis.cuda().float()
-            after_axis = after_axis.cuda().float()
+        for idx, (index,point,centers,axis,masks) in enumerate(test_dataloader):
+            point = point.cuda().float()
+            centers = centers.cuda().float()
+            axis = axis.cuda().float()
             masks = masks.cuda()
-            latents, predicted_latents = base_model(after_points,after_axis,before_points)
-
+            generated_points = base_model.module.sample()
+            generated_points = rearrange(generated_points,'b n p c -> b (n p) c')
+            
             # diffusion loss
-            criterion = nn.MSELoss(reduction='none')
-            loss1 = criterion(latents,predicted_latents).sum(dim=-1)
-            loss1 = 0.1*(loss1 * masks).mean()
-
-            # rec loss
-            prediction = base_model.module.decode(predicted_latents)
-            predicted_centers, normal1,normal2 = get_center_and_axis(prediction)
-            gt_normal1 = before_axis[:,:,3:6]
-            gt_normal2 = before_axis[:,:,6:]
-            normal1 = nn.functional.normalize(normal1,dim=-1)
-            normal2 = nn.functional.normalize(normal2,dim=-1)
-            gt_normal1 = nn.functional.normalize(gt_normal1,dim=-1)
-            gt_normal2 = nn.functional.normalize(gt_normal2,dim=-1)
-            RR = align_axis(normal1,normal2,gt_normal1,gt_normal2)
-            RR = rearrange(RR,'(b n) p c -> b n p c',n=32)
-            # before_point_cloud = rearrange(before_points,'b n p c -> (b n) p c')
-            # before_point_cloud = before_point_cloud - rearrange(before_centers,'b n c -> (b n) c').unsqueeze(1)
-            # before_point_cloud = torch.bmm(before_point_cloud,RR)
-            # predicted_cloud = before_point_cloud + rearrange(predicted_centers,'b n c -> (b n) c').unsqueeze(1)
-            # predicted_cloud = rearrange(predicted_cloud,'(b n) p c -> b (n p) c',n=32)
-            # idx = 0
-            # write_pointcloud(predicted_cloud[idx].cpu().numpy(),'/data3/leics/dataset/test.ply')
-            # exit()
-            for i in range(bs):
-                transform_teeth(index[i],config.before_mesh_path,config.after_mesh_path,RR[i],predicted_centers[i])
-            # loss2 = criterion(predicted_cloud,after_points).sum(dim=(-1,-2))
-            # loss2 = 0.1*(loss2 * masks).mean()
-            # loss = loss1 + loss2
-            # losses.update([loss.item(),loss1.item(),loss2.item()])
-    # ADD = cal_average('ADD.txt')
-    # CSA = cal_average('CSA.txt')
-    # PA_ADD = cal_average('PA_ADD.txt')
-    # ROT = cal_average('ROT.txt')
-    # FD = cal_average('FD.txt')
-    # print('ADD:',ADD)
-    # print('PA_ADD:',PA_ADD)
-    # print('CSA:',CSA)
-    # print('ME_ROT:',ROT)
-    # print('FD:',FD)
+            criterion = nn.MSELoss()
+            for i in range(64):
+                write_pointcloud(generated_points[i].cpu().numpy(),f'/data3/leics/dataset/tmp/test{i}.ply')
+            exit()
 
 
 

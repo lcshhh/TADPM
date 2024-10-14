@@ -32,7 +32,7 @@ class VoxelUNet(nn.Module):
         super(VoxelUNet, self).__init__()
         self.resolution = 4
         self.local_encoders = nn.ModuleList([PointNetEncoder(config.local_encoder) for _ in range(32)])
-        self.unet_encoder = UNet3D(128,32)
+        self.unet_encoder = ResidualUNetSE3D(128,32,final_sigmoid=False,is_segmentation=False)
         self.quantizer = LFQ(
             codebook_size = 4096,      # codebook size, must be a power of 2
             dim = 32,                   # this is the input feature dimension, defaults to log2(codebook_size) if not defined
@@ -40,7 +40,7 @@ class VoxelUNet(nn.Module):
             diversity_gamma = 1.,        # within entropy loss, how much weight to give to diversity of codes, taken from https://arxiv.org/abs/1911.05894
             experimental_softplus_entropy_loss=True
         )
-        self.unet_decoder = UNet3D(32,3)
+        self.unet_decoder = ResidualUNetSE3D(32,3,final_sigmoid=False,is_segmentation=False)
         self.final_dim = (self.resolution ** 3)
         self.mlp = nn.Sequential(
             nn.Linear(self.final_dim,512)
@@ -58,3 +58,17 @@ class VoxelUNet(nn.Module):
         rec = self.mlp(decoded)
         rec = rearrange(rec,'b c n p-> b n p c')
         return rec, entropy_aux_loss
+    
+    def encode(self, points):
+        features = torch.stack([self.local_encoders[i].encode(points[:,i]) for i in range(32)],dim=2)  # [B,C,N,P]
+        features = patchify(features)
+        z = self.unet_encoder(features)
+        return z
+
+    def decode(self,z):
+        z, indices, entropy_aux_loss = self.quantizer(z) 
+        decoded = unpatchify(self.unet_decoder(z))
+        rec = self.mlp(decoded)
+        rec = rearrange(rec,'b c n p-> b n p c')
+        return rec
+

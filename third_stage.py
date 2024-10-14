@@ -40,10 +40,9 @@ def get_args():
     parser.add_argument('--save_root', type = str, required=True)
     parser.add_argument('--exp_name', type = str, required=True)
     parser.add_argument('--ckpts', type = str, default='')
-    parser.add_argument('--vae_ckpts', type = str, default='')
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--val_freq', type = int, default=1, help = 'test freq')
-    parser.add_argument('--PCN_checkpoint', type = str, default='')
+    parser.add_argument('--vae_checkpoint', type = str, default='')
     parser.add_argument(
         '--test', 
         action='store_true', 

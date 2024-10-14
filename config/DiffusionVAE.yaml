@@ -13,40 +13,38 @@ scheduler: {
 }}
 
 dataset : {
-  train : { NAME: PairDataset,
+  train : { NAME: FullTeethDataset,
             train: True,
             file: files/second_stage/train.txt,
-            after_path: /data3/leics/dataset/type2/pointcloud512_after,
-            after_axis_path: /data3/leics/dataset/type2/single_after_axis,
-            before_path: /data3/leics/dataset/type2/pointcloud512_before,
-            before_axis_path: /data3/leics/dataset/type2/single_before_axis,
+            after_path: /data3/leics/dataset/type2/single_after_inside512,
+            axis_path: /data3/leics/dataset/type2/single_after_axis,
             npoint: 512
             },
-  val : { NAME: PairDataset,
+  val : { NAME: FullTeethDataset,
           train: False,
           file: files/second_stage/test.txt,
-          after_path: /data3/leics/dataset/type2/pointcloud512_after,
-          after_axis_path: /data3/leics/dataset/type2/single_after_axis,
-          before_path: /data3/leics/dataset/type2/pointcloud512_before,
-          before_axis_path: /data3/leics/dataset/type2/single_before_axis,
+          after_path: /data3/leics/dataset/type2/single_after_inside512,
+            axis_path: /data3/leics/dataset/type2/single_after_axis,
           npoint: 512},
-  test : {  NAME: PairDataset,
+  test : {  NAME: FullTeethDataset,
             train: False,
             file: files/second_stage/test.txt,
-            after_path: /data3/leics/dataset/type2/pointcloud512_after,
-            after_axis_path: /data3/leics/dataset/type2/single_after_axis,
-            before_path: /data3/leics/dataset/type2/pointcloud512_before,
-            before_axis_path: /data3/leics/dataset/type2/single_before_axis,
+            after_path: /data3/leics/dataset/type2/single_after_inside512,
+            axis_path: /data3/leics/dataset/type2/single_after_axis,
             npoint: 512}}
 
 model : {
   NAME: DiffusionVAE,
-  z_dim: 1024, 
-  latent_dim: 1024, 
-  PCN: {
-    num_dense: 512, 
-    latent_dim: 1024, 
-    grid_size: 4
+  vae: {
+    local_encoder: {
+    zdim: 512,
+    num_dense: 512,
+    latent_dim: 512, 
+    input_dim: 3,
+    n_head: 8,
+    grid_size: 4,
+    depth: 12
+    }
   }
 }
 
@@ -54,7 +52,7 @@ model : {
 npoints: 512
 total_bs : 64
 step_per_update : 1
-max_epoch : 300
+max_epoch : 1000
 grad_norm_clip : 10
 before_mesh_path: /data3/leics/dataset/type2/single_before
 after_mesh_path: /data3/leics/dataset/type2/single_after

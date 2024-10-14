@@ -1,6 +1,6 @@
 ENT="python second_stage.py "
 cfg="config/ae.yaml"
-ckpts="/data3/leics/dataset/checkpoints/voxel/voxel_lfq/ckpt-best.pth"
+ckpts="/data3/leics/dataset/checkpoints/diffusion/DiffusionVAE_newloss/ckpt-last.pth"
 saveroot="/data3/leics/dataset/checkpoints/global"
 exp_name="vqvae"
 launcher="none"
