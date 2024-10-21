@@ -105,7 +105,8 @@ class diffusion(nn.Module):
             at = compute_alpha(self.betas.to(t.device), t.long())
             at_next = compute_alpha(self.betas.to(t.device), next_t.long())
             xt = xs[-1].to(torch.float32)
-            x0_t = self.model(xt,t)
+            temb = timestep_embedding(t,128)
+            x0_t = self.model(xt,temb)
             et = (xt - x0_t * at.sqrt())/((1-at).sqrt())
             c1 = (
                 0 * ((1 - at / at_next) * (1 - at_next) / (1 - at)).sqrt()

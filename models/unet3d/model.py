@@ -97,7 +97,7 @@ class AbstractUNet(nn.Module):
         for decoder, encoder_features in zip(self.decoders, encoders_features):
             # pass the output from the corresponding encoder and the output
             # of the previous decoder
-            x = decoder(encoder_features, x)
+            x = decoder(encoder_features, x, temb)
 
         x = self.final_conv(x)
 
@@ -199,7 +199,7 @@ class DiffusionUNet(AbstractUNet):
         super(DiffusionUNet, self).__init__(in_channels=in_channels,
                                              out_channels=out_channels,
                                              final_sigmoid=final_sigmoid,
-                                             basic_module=ResNetBlock,
+                                             basic_module=DiffusionConvBlock,
                                              f_maps=f_maps,
                                              layer_order=layer_order,
                                              num_groups=num_groups,

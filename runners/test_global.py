@@ -112,8 +112,11 @@ def test_global(args, config, logger):
             print(rec_loss)
             outputs = outputs * masks.unsqueeze(2).unsqueeze(3)
             outputs = rearrange(outputs,'b n p c -> b (n p) c')
+            point = rearrange(point,'b n p c -> b (n p) c')
+            # for i in range(32):
             i=3
-            write_pointcloud(outputs[i].cpu().numpy(),'/data3/leics/dataset/test.ply')
+            write_pointcloud(point[i].cpu().numpy(),'/data3/leics/dataset/before.ply')
+            write_pointcloud(outputs[i].cpu().numpy(),'/data3/leics/dataset/after.ply')
 
         logger.info('[TEST] Loss rec_loss kl_loss = %s' % (['%.4f' % l for l in losses.avg()]))
 

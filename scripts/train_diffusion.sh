@@ -1,9 +1,9 @@
 ENT="python third_stage.py "
 cfg="config/DiffusionVAE.yaml"
 saveroot="/data3/leics/dataset/checkpoints/diffusion"
-exp_name="DiffusionVAE_newloss"
+exp_name="diffusionunet"
 launcher="none"
-vae_checkpoint="/data3/leics/dataset/checkpoints/voxel/residual/ckpt-last.pth"
+vae_checkpoint="/data3/leics/dataset/checkpoints/voxel/residual/ckpt-best.pth"
 
 
 
