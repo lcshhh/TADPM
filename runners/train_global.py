@@ -124,7 +124,7 @@ def train_global(args, config, train_writer, val_writer, logger):
         data_time = AverageMeter()
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
-        losses = AverageMeter(['loss','rec_loss','ent_loss'])
+        losses = AverageMeter(['loss','rec_loss','ent_loss','mask_loss'])
         # validate(base_model, test_dataloader, epoch, val_writer, args, config, logger=logger)
         for idx, (index,point,centers,axis,masks) in enumerate(train_dataloader): 
             optimizer.zero_grad()
@@ -135,23 +135,24 @@ def train_global(args, config, train_writer, val_writer, logger):
             centers = centers.cuda().float()
             axis = axis.cuda().float()
             masks = masks.cuda()
-            outputs,entropy_loss = base_model(point)
+            outputs,entropy_loss,predicted_masks = base_model(point)
             entropy_loss = entropy_loss.mean()
             rec_loss = 10*torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
-            # rec_loss = 10*(outputs-point).abs().mean()
+            criterion = nn.MSELoss()
             rec_loss = (rec_loss * masks).mean()
-            loss = rec_loss + entropy_loss
+            mask_loss = criterion(masks.float(),predicted_masks)
+            loss = rec_loss + entropy_loss + mask_loss
             #######
             with autograd.detect_anomaly():
                 loss.backward()
             optimizer.step()
-            losses.update([loss.item(),rec_loss.item(),entropy_loss.item()])
+            losses.update([loss.item(),rec_loss.item(),entropy_loss.item(),mask_loss.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
             
             if idx % 5 == 0:
-                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss embed_loss rec_loss ent_loss = %s lr = %.6f' %
+                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss embed_loss rec_loss ent_loss mask = %s lr = %.6f' %
                             (epoch, config.max_epoch, idx + 1, n_batches, batch_time.val(), data_time.val(),
                             ['%.4f' % l for l in losses.val()], optimizer.param_groups[0]['lr']))
         if isinstance(scheduler, list):
@@ -189,7 +190,7 @@ def train_global(args, config, train_writer, val_writer, logger):
 def validate(base_model, test_dataloader, epoch, val_writer, args, config, logger = None):
     logger.info(f"[VALIDATION] Start validating epoch {epoch}")
     base_model.eval()  # set model to eval mode
-    losses = AverageMeter(['loss','rec_loss'])
+    losses = AverageMeter(['loss','rec_loss','mask_loss'])
     with torch.no_grad():
         for idx, (index,point,centers,axis,masks) in enumerate(test_dataloader):
             point = point.cuda().float()
@@ -197,13 +198,16 @@ def validate(base_model, test_dataloader, epoch, val_writer, args, config, logge
             axis = axis.cuda().float()
             masks = masks.cuda()
             # attn_mask = create_attn_mask(masks)
-            outputs, *_ = base_model(point)
-            rec_loss = torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
+            outputs,entropy_loss,predicted_masks = base_model(point)
+            entropy_loss = entropy_loss.mean()
+            rec_loss = 10*torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
             rec_loss = (rec_loss * masks).mean()
-            loss = rec_loss
-            losses.update([loss.item(),rec_loss.item()])
+            criterion = nn.MSELoss()
+            mask_loss = criterion(masks.float(),predicted_masks)
+            loss = rec_loss + mask_loss
+            losses.update([loss.item(),rec_loss.item(),mask_loss.item()])
 
-        logger.info('[Validation] EPOCH: %d  Loss embed_loss rec_loss = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
+        logger.info('[Validation] EPOCH: %d  Loss rec_loss mask_loss = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
 
 
     # Add testing results to TensorBoard
