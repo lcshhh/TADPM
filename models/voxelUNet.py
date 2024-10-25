@@ -72,7 +72,8 @@ class VoxelUNet(nn.Module):
     def decode(self,z):
         z, indices, entropy_aux_loss = self.quantizer(z) 
         decoded = unpatchify(self.unet_decoder(z))
-        rec = self.mlp(decoded)
-        rec = rearrange(rec,'b c n p-> b n p c')
-        return rec
+        rec = torch.stack([self.mlps[i](decoded[:,i]) for i in range(32)],dim=1)
+        masks = torch.stack([self.mask_predictor[i](decoded[:,i]) for i in range(32)],dim=1).squeeze(2)
+        rec = rearrange(rec,'b n (p c)-> b n p c',c=3)
+        return rec, masks
 

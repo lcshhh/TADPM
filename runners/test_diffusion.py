@@ -197,8 +197,22 @@ def test_diffusion(args, config, logger):
             centers = centers.cuda().float()
             axis = axis.cuda().float()
             masks = masks.cuda()
-            generated_points = base_model.module.sample()
+            generated_points, masks = base_model.module.sample()
+            masks[masks>0.5] = 1
+            masks[masks<0.5] = 0
+            generated_points = generated_points * masks[:,:,None,None]
             generated_points = rearrange(generated_points,'b n p c -> b (n p) c')
+            
+            ### syn
+            # generated_points = rearrange(generated_points,'b (n p) c -> b n p c',n=32)
+            # batch_idx = 10
+            # generated_points = generated_points[batch_idx]
+            # for i in range(32):
+            #     if masks[batch_idx][i] > 0.5:
+            #         write_pointcloud(generated_points[i].cpu().numpy(),f'/data3/leics/dataset/syn/{i}.ply')
+            
+            # exit()
+            ###
             
             # diffusion loss
             criterion = nn.MSELoss()

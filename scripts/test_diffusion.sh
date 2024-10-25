@@ -1,7 +1,8 @@
 ENT="python third_stage.py "
 cfg="config/DiffusionVAE.yaml"
 saveroot="/data3/leics/dataset/checkpoints/diffusion"
-ckpts="/data3/leics/dataset/checkpoints/diffusion/diffusionunet/ckpt-best.pth"
+#内部是diffusionmask1e-3，外部是diffusionmask_surface
+ckpts="/data3/leics/dataset/checkpoints/diffusion/diffusionmask1e-3/ckpt-best.pth"
 exp_name="DiffusionVAE"
 launcher="none"
 

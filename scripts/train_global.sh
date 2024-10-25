@@ -1,7 +1,8 @@
 ENT="python second_stage.py "
 cfg="config/ae.yaml"
 saveroot="/data3/leics/dataset/checkpoints/voxel"
-exp_name="mask1e-4"
+#内部的名字叫mask,外部叫mask_surface
+exp_name="mask_surface2"
 launcher="none"
 
 

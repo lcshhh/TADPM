@@ -50,10 +50,10 @@ class DiffusionVAE(nn.Module):
         return out
     
     def sample(self):
-        z = torch.randn(64,32,8,8,32)
+        z = torch.randn(64,128,8,8,32)
         predicted_latents = self.dpm.ddim_sample(z).float()
-        points = self.vae.decode(predicted_latents)
-        return points
+        points, masks = self.vae.decode(predicted_latents)
+        return points, masks
 
 
 

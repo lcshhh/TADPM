@@ -63,7 +63,7 @@ class diffusion(nn.Module):
         self.betas = cosine_beta_schedule(self.timesteps).cuda()
         self.alphas = 1. - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
-        self.model = DiffusionUNet(32,32)
+        self.model = DiffusionUNet(128,128)
         # self.model = ResidualUNetSE3D(32,32)
         self.eta = 1
         self.sqrt_alphas_cumprod =  torch.sqrt(self.alphas_cumprod)
