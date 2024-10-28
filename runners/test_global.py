@@ -104,7 +104,7 @@ def test_global(args, config, logger):
             masks = masks.cuda()
             # outputs = base_model(point)
             # outputs = rearrange(outputs,'b c n p -> b n p c')
-            outputs, *_ = base_model(point)
+            outputs, l, predicted_masks = base_model(point)
             rec_loss = torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
             rec_loss = (rec_loss * masks).mean()
             loss = rec_loss
