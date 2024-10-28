@@ -31,7 +31,9 @@ class DiffusionVAE(nn.Module):
     def forward(self, points):
         self.vae.eval()
         latents = self.vae.encode(points)
-        predicted_latents = self.dpm(latents)
+        input_latents = rearrange(latents,'b c w h d -> b (w h d) c')
+        predicted_latents = self.dpm(input_latents)
+        predicted_latents = rearrange(predicted_latents,'b (w h d) c -> b c w h d',w=2*self.resolution,h=2*self.resolution,d=8*self.resolution)
         
         # out = out.view(B, 512, C)
         return latents,  predicted_latents

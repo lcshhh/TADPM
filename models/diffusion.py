@@ -8,7 +8,9 @@ import torch.nn.functional as F
 # from model.Dit import DiT
 import math
 from models import *
+from models.uvit import UViT
 import yaml
+
 def timestep_embedding(timesteps, dim, max_period=10000):
     """
     Create sinusoidal timestep embeddings.
@@ -63,7 +65,8 @@ class diffusion(nn.Module):
         self.betas = cosine_beta_schedule(self.timesteps).cuda()
         self.alphas = 1. - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
-        self.model = DiffusionUNet(64,64)
+        # self.model = DiffusionUNet(64,64)
+        self.model = UViT()
         # self.model = ResidualUNetSE3D(32,32)
         self.eta = 1
         self.sqrt_alphas_cumprod =  torch.sqrt(self.alphas_cumprod)
@@ -126,6 +129,6 @@ class diffusion(nn.Module):
         noise = torch.randn_like(batched_inputs).cuda()
         x_t = self.q_sample(batched_inputs,t,noise)
         x_t = x_t.to(torch.float32)
-        temb = timestep_embedding(t,128)
-        predicted_6dof = self.model(x_t,temb)
+        # temb = timestep_embedding(t,128)
+        predicted_6dof = self.model(x_t,t)
         return predicted_6dof

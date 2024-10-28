@@ -160,7 +160,7 @@ def pre_handle(poses):
 
 
 class UViT(nn.Module):
-    def __init__(self, img_size=224, patch_size=2, in_chans=9, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4.,
+    def __init__(self, patch_size=2, in_chans=9, embed_dim=64, depth=12, num_heads=8, mlp_ratio=4.,
                  qkv_bias=True, qk_scale=None, norm_layer=nn.LayerNorm, mlp_time_embed=True, num_classes=-1,
                  use_checkpoint=False, conv=False, skip=True):
         super().__init__()
@@ -169,7 +169,7 @@ class UViT(nn.Module):
         self.in_chans = in_chans
 
         self.patch_embed = PatchEmbed(patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
-        num_patches = 8
+        num_patches = 8*8*32
 
         self.time_embed = nn.Sequential(
             nn.Linear(embed_dim, 4 * embed_dim),
@@ -182,9 +182,9 @@ class UViT(nn.Module):
         #     self.extras = 2
         # else:
         #     self.extras = 1
-        self.extras = 33
+        self.extras = 1
         self.label_emb = nn.Sequential(
-            nn.Linear(1827, embed_dim),
+            nn.Linear(embed_dim, embed_dim),
             nn.GELU(),
             nn.Linear(embed_dim, embed_dim),
         )
@@ -211,13 +211,11 @@ class UViT(nn.Module):
         self.patch_dim = patch_size ** 2 * in_chans
         # self.decoder_pred = nn.Linear(embed_dim, self.patch_dim, bias=True)
         self.decoder_pred = nn.Sequential(
-            nn.Linear(embed_dim, 512),
+            nn.Linear(embed_dim, embed_dim),
             nn.GELU(),
-            nn.Linear(512, 256),
+            nn.Linear(embed_dim, embed_dim),
             nn.GELU(),
-            nn.Linear(256, self.patch_dim),
-            nn.GELU(),
-            nn.Linear(self.patch_dim, self.patch_dim),
+            nn.Linear(embed_dim, embed_dim),
         )
         # self.final_layer = nn.Sequential(
         #     nn.Linear(32*in_chans, 32*in_chans),
@@ -244,19 +242,20 @@ class UViT(nn.Module):
     def no_weight_decay(self):
         return {'pos_embed'}
 
-    def forward(self, x, timesteps, y):
+    def forward(self, x, timesteps, y=None):
         '''
         x: [bs,32,in_channel]
         y: [bs,32,1827]
         '''
-        x = rearrange(x,'b (w h) c -> b c w h', w=16)  #[bs,in_channel,2,16] in_channel=6
-        x = self.patch_embed(x)
+        # x = rearrange(x,'b (w h) c -> b c w h', w=16)  #[bs,in_channel,2,16] in_channel=6
+        # x = self.patch_embed(x)
         B, L, D = x.shape
         time_token = self.time_embed(timestep_embedding(timesteps, self.embed_dim))
         time_token = time_token.unsqueeze(dim=1)
         x = torch.cat((time_token, x), dim=1)
-        label_emb = self.label_emb(y)
-        x = torch.cat((label_emb, x), dim=1)
+        if y is not None:
+            label_emb = self.label_emb(y)
+            x = torch.cat((label_emb, x), dim=1)
         x = x + self.pos_embed
         skips = []
         for blk in self.in_blocks:
@@ -272,7 +271,7 @@ class UViT(nn.Module):
         x = self.decoder_pred(x)
         assert x.size(1) == self.extras + L
         x = x[:, self.extras:, :]
-        x = unpatchify(x, self.in_chans)
+        # x = unpatchify(x, self.in_chans)
         # x = einops.rearrange(x,'b c w h -> (b w h) c')
         # x[:,3:] = pre_handle(x[:,3:].clone())
         # x = einops.rearrange(x,'(b n) c -> b n c',n=32)
@@ -280,9 +279,9 @@ class UViT(nn.Module):
         # x = einops.rearrange(x,'b (n c) -> (b n) c',n=32)
 
         # diffusion2
-        x = einops.rearrange(x,'b c w h -> (b w h) c')
-        x[:,3:] = pre_handle(x[:,3:].clone())
-        x = einops.rearrange(x,'(b n) c -> b n c',n=32)
+        # x = einops.rearrange(x,'b c w h -> (b w h) c')
+        # x[:,3:] = pre_handle(x[:,3:].clone())
+        # x = einops.rearrange(x,'(b n) c -> b n c',n=32)
         # x = einops.rearrange(x,'b c w h -> b (w h) c')
 
         # train
