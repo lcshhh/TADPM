@@ -14,12 +14,12 @@ class DiffusionVAE(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.vae = VoxelUNet(config.vae)
-        self.resolution = config.vae.resolution
-        self.zdim = config.vae.zdim
-        self.vae.requires_grad_(False)
         if config.args.vae_checkpoint!='':
             checkpoints = torch.load(config.args.vae_checkpoint)
             self.vae.load_state_dict(checkpoints['base_model'])
+        self.resolution = config.vae.resolution
+        self.zdim = config.vae.zdim
+        self.vae.requires_grad_(False)
         self.dpm = diffusion()
     
     def decode(self, z):
@@ -31,12 +31,13 @@ class DiffusionVAE(nn.Module):
     def forward(self, points):
         self.vae.eval()
         latents = self.vae.encode(points)
-        input_latents = rearrange(latents,'b c w h d -> b (w h d) c')
-        predicted_latents = self.dpm(input_latents)
-        predicted_latents = rearrange(predicted_latents,'b (w h d) c -> b c w h d',w=2*self.resolution,h=2*self.resolution,d=8*self.resolution)
+        # input_latents = rearrange(latents,'b c w h d -> b (w h d) c')
+        predicted_latents = self.dpm(latents)
+        # predicted_latents = rearrange(predicted_latents,'b (w h d) c -> b c w h d',w=2*self.resolution,h=2*self.resolution,d=8*self.resolution)
+        rec, masks = self.vae.decode(predicted_latents)
         
         # out = out.view(B, 512, C)
-        return latents,  predicted_latents
+        return latents,  predicted_latents, rec, masks
 
         # for point-wise decoder
         z_clone = z.clone().detach()

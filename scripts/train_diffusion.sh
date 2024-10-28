@@ -1,7 +1,7 @@
 ENT="python third_stage.py "
 cfg="config/DiffusionVAE.yaml"
 saveroot="/data3/leics/dataset/checkpoints/diffusion"
-exp_name="diffusionmask_surface_transformer"
+exp_name="diffusionmask_surface_newloss"
 launcher="none"
 vae_checkpoint="/data3/leics/dataset/checkpoints/voxel/mask_surface3_64/best.pth"
 

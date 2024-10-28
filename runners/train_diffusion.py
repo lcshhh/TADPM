@@ -120,7 +120,7 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
         batch_start_time = time.time()
         batch_time = AverageMeter()
         data_time = AverageMeter()
-        losses = AverageMeter(['loss'])
+        losses = AverageMeter(['loss','rec','diff','mask'])
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
 
@@ -133,23 +133,29 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
             centers = centers.cuda().float()
             axis = axis.cuda().float()
             masks = masks.cuda()
-            latents, predicted_latents = base_model(point)
+            latents, predicted_latents, rec, predicted_masks = base_model(point)
+
+            rec_loss = 10*torch.stack([chamfer_distance(point[:,i],rec[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
+            criterion = nn.MSELoss()
+            rec_loss = (rec_loss * masks).mean()
+            mask_loss = criterion(masks.float(),predicted_masks)
 
             # diffusion loss
             criterion = nn.MSELoss()
-            loss = 10*criterion(latents,predicted_latents)
+            diff_loss = 10*criterion(latents,predicted_latents)
+            loss = rec_loss + mask_loss + diff_loss
 
             #######
 
             loss.backward()
             optimizer.step()
-            losses.update([loss.item()])
+            losses.update([loss.item(),rec_loss.item(),diff_loss.item(),mask_loss.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
             
             if idx % 5 == 0:
-                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss= %s lr = %.6f' %
+                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss rec diff mask= %s lr = %.6f' %
                             (epoch, config.max_epoch, idx + 1, n_batches, batch_time.val(), data_time.val(),
                             ['%.4f' % l for l in losses.val()], optimizer.param_groups[0]['lr']))
         if isinstance(scheduler, list):
@@ -194,11 +200,18 @@ def validate(base_model, test_dataloader, epoch, val_writer, args, config, logge
             centers = centers.cuda().float()
             axis = axis.cuda().float()
             masks = masks.cuda()
-            latents, predicted_latents = base_model(point)
+            latents, predicted_latents, rec, predicted_masks = base_model(point)
+
+            rec_loss = 10*torch.stack([chamfer_distance(point[:,i],rec[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
+            criterion = nn.MSELoss()
+            rec_loss = (rec_loss * masks).mean()
+            mask_loss = criterion(masks.float(),predicted_masks)
 
             # diffusion loss
             criterion = nn.MSELoss()
-            loss = criterion(latents,predicted_latents)
+            diff_loss = 10*criterion(latents,predicted_latents)
+            loss = rec_loss + mask_loss + diff_loss
+
             losses.update([loss.item()])
 
         logger.info('[Validation] EPOCH: %d  Loss = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
