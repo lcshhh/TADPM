@@ -137,7 +137,7 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
 
             # diffusion loss
             criterion = nn.MSELoss()
-            loss = criterion(latents,predicted_latents)
+            loss = 10*criterion(latents,predicted_latents)
 
             #######
 

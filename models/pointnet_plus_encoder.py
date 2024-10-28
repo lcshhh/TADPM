@@ -116,6 +116,7 @@ class PointNetEncoder(nn.Module):
         features = x
         for layer_id, layer in enumerate(self.layers):
             features, xyz, _ = layer( (features, xyz, None) )
+        features = self.mlp(features.transpose(1,2)).transpose(1,2)
         # features: B,D,N; xyz: B,3,N
         # features = features.max(-1)[0]
         # features = self.mlp(features)

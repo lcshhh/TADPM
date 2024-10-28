@@ -143,8 +143,7 @@ def train_global(args, config, train_writer, val_writer, logger):
             mask_loss = criterion(masks.float(),predicted_masks)
             loss = rec_loss + entropy_loss + mask_loss
             #######
-            with autograd.detect_anomaly():
-                loss.backward()
+            loss.backward()
             optimizer.step()
             losses.update([loss.item(),rec_loss.item(),entropy_loss.item(),mask_loss.item()])
 
@@ -200,7 +199,7 @@ def validate(base_model, test_dataloader, epoch, val_writer, args, config, logge
             # attn_mask = create_attn_mask(masks)
             outputs,entropy_loss,predicted_masks = base_model(point)
             entropy_loss = entropy_loss.mean()
-            rec_loss = 10*torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
+            rec_loss = 100*torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
             rec_loss = (rec_loss * masks).mean()
             criterion = nn.MSELoss()
             mask_loss = criterion(masks.float(),predicted_masks)

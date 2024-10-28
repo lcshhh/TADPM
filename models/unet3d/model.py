@@ -174,7 +174,7 @@ class ResidualUNetSE3D(AbstractUNet):
     net, in theory it allows for deeper UNet.
     """
 
-    def __init__(self, in_channels, out_channels, final_sigmoid=False, f_maps=64, layer_order='gcr',
+    def __init__(self, in_channels, out_channels, final_sigmoid=False, f_maps=128, layer_order='gcr',
                  num_groups=8, num_levels=4, is_segmentation=False, conv_padding=1,
                  conv_upscale=2, upsample='default', dropout_prob=0.1, **kwargs):
         super(ResidualUNetSE3D, self).__init__(in_channels=in_channels,

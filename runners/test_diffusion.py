@@ -197,9 +197,10 @@ def test_diffusion(args, config, logger):
             centers = centers.cuda().float()
             axis = axis.cuda().float()
             masks = masks.cuda()
-            generated_points, masks = base_model.module.sample()
-            masks[masks>0.5] = 1
-            masks[masks<0.5] = 0
+            batch = point.shape[0]
+            generated_points, masks = base_model.module.sample(batch)
+            masks[masks>0.3] = 1
+            masks[masks<0.3] = 0
             generated_points = generated_points * masks[:,:,None,None]
             generated_points = rearrange(generated_points,'b n p c -> b (n p) c')
             

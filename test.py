@@ -1,7 +1,7 @@
 # from models import PointNetPlusEncoder
 import torch
 # import trimesh
-from models import UNet3D
+# from models import UNet3D
 # with open('valid.txt') as f:
 #     indexes = [int(i.strip()) for i in f.readlines()]
 # root = '/data3/leics/dataset/type2/single_before'
@@ -30,23 +30,16 @@ from models import UNet3D
 # print(output.shape)
 
 import torch
-from vector_quantize_pytorch import LFQ
+from vector_quantize_pytorch import LFQ,ResidualVQ
 
-quantizer = LFQ(
-    codebook_size = 65536,
-    dim = 16,
-    entropy_loss_weight = 0.1,
-    diversity_gamma = 1.,
-    experimental_softplus_entropy_loss=True
-)
+quantizer = ResidualVQ(
+            dim = 128,
+            codebook_size = 4096,
+            num_quantizers = 4,
+            kmeans_init = True,   # set to True
+            kmeans_iters = 10     # number of kmeans iterations to calculate the centroids for the codebook on init
+ )
 
-seq = torch.randn(1, 32, 16)
+seq = torch.randn(32, 16, 128)
 quantized, indices, loss = quantizer(seq)
 print(loss)
-
-assert seq.shape == quantized.shape
-
-video_feats = torch.randn(1, 16, 10, 32, 32)
-quantized, indices, loss= quantizer(video_feats)
-print(loss)
-assert video_feats.shape == quantized.shape

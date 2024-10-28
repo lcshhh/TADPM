@@ -36,8 +36,10 @@ dataset : {
 model : {
   NAME: DiffusionVAE,
   vae: {
+    zdim: 64,
+    resolution: 4,
     local_encoder: {
-    zdim: 512,
+    zdim: 64,
     num_dense: 512,
     latent_dim: 512, 
     input_dim: 3,

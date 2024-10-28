@@ -63,7 +63,7 @@ class diffusion(nn.Module):
         self.betas = cosine_beta_schedule(self.timesteps).cuda()
         self.alphas = 1. - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
-        self.model = DiffusionUNet(128,128)
+        self.model = DiffusionUNet(64,64)
         # self.model = ResidualUNetSE3D(32,32)
         self.eta = 1
         self.sqrt_alphas_cumprod =  torch.sqrt(self.alphas_cumprod)
@@ -109,7 +109,7 @@ class diffusion(nn.Module):
             x0_t = self.model(xt,temb)
             et = (xt - x0_t * at.sqrt())/((1-at).sqrt())
             c1 = (
-                0 * ((1 - at / at_next) * (1 - at_next) / (1 - at)).sqrt()
+                self.eta * ((1 - at / at_next) * (1 - at_next) / (1 - at)).sqrt()
             )
             c2 = ((1 - at_next) - c1 ** 2).sqrt()
             xt_next = at_next.sqrt() * x0_t + c1 * torch.randn_like(x) + c2 * et

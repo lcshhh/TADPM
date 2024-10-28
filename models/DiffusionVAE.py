@@ -8,11 +8,14 @@ from models.PCN import PCN
 from utils.builder import MODELS 
 # from util import SharedMLP, LinearMLP
 
+
 @MODELS.register_module()
 class DiffusionVAE(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.vae = VoxelUNet(config.vae)
+        self.resolution = config.vae.resolution
+        self.zdim = config.vae.zdim
         self.vae.requires_grad_(False)
         if config.args.vae_checkpoint!='':
             checkpoints = torch.load(config.args.vae_checkpoint)
@@ -26,6 +29,7 @@ class DiffusionVAE(nn.Module):
 
 
     def forward(self, points):
+        self.vae.eval()
         latents = self.vae.encode(points)
         predicted_latents = self.dpm(latents)
         
@@ -49,8 +53,8 @@ class DiffusionVAE(nn.Module):
         # out = out.view(B, 512, C)
         return out
     
-    def sample(self):
-        z = torch.randn(64,128,8,8,32)
+    def sample(self,sample_num):
+        z = torch.randn(sample_num,self.zdim,2*self.resolution,2*self.resolution,8*self.resolution)
         predicted_latents = self.dpm.ddim_sample(z).float()
         points, masks = self.vae.decode(predicted_latents)
         return points, masks
