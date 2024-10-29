@@ -109,6 +109,8 @@ def test_global(args, config, logger):
             rec_loss = (rec_loss * masks).mean()
             loss = rec_loss
             losses.update([loss.item(),rec_loss.item()])
+            print(predicted_masks[0])
+            exit()
             print(rec_loss)
             outputs = outputs * masks.unsqueeze(2).unsqueeze(3)
             outputs = rearrange(outputs,'b n p c -> b (n p) c')

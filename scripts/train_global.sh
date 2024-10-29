@@ -3,7 +3,7 @@ cfg="config/ae.yaml"
 saveroot="/data3/leics/dataset/checkpoints/voxel"
 #内部的名字叫mask,外部叫mask_surface
 ckpts="/data3/leics/dataset/checkpoints/voxel/mask_surface3_64/best.pth"
-exp_name="mask_surface3_64"
+exp_name="mask_surface4_64"
 launcher="none"
 
 

@@ -140,7 +140,8 @@ def train_global(args, config, train_writer, val_writer, logger):
             rec_loss = 10*torch.stack([chamfer_distance(point[:,i],outputs[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
             criterion = nn.MSELoss()
             rec_loss = (rec_loss * masks).mean()
-            mask_loss = criterion(masks.float(),predicted_masks)
+            # mask_loss = criterion(masks.float(),predicted_masks)
+            mask_loss = 0.1 * torch.abs(masks.float()-predicted_masks).sum()
             loss = rec_loss + entropy_loss + mask_loss
             #######
             loss.backward()
