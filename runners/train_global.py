@@ -141,7 +141,7 @@ def train_global(args, config, train_writer, val_writer, logger):
             criterion = nn.MSELoss()
             rec_loss = (rec_loss * masks).mean()
             # mask_loss = criterion(masks.float(),predicted_masks)
-            mask_loss = 0.1 * torch.abs(masks.float()-predicted_masks).sum()
+            mask_loss = 0.01 * torch.abs(masks.float()-predicted_masks).sum()
             loss = rec_loss + entropy_loss + mask_loss
             #######
             loss.backward()

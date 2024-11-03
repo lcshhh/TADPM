@@ -8,7 +8,7 @@ optimizer : {
 scheduler: {
   type: CosLR,
   kwargs: {
-    epochs: 500,
+    epochs: 1000,
     initial_epochs : 10
 }}
 
@@ -17,31 +17,32 @@ dataset : {
             train: True,
             file: files/second_stage/train.txt,
             # after_path: /data3/leics/dataset/type2/single_after_inside512,
-            after_path: /data3/leics/dataset/type2/single_after_pointcloud512,
+            after_path: /data3/leics/dataset/type2/single_after_pointcloud256,
             axis_path: /data3/leics/dataset/type2/single_after_axis,
-            npoint: 512
+            npoint: 256
             },
   val : { NAME: FullTeethDataset,
           train: False,
           file: files/second_stage/test.txt,
           # after_path: /data3/leics/dataset/type2/single_after_inside512,
-          after_path: /data3/leics/dataset/type2/single_after_pointcloud512,
+          after_path: /data3/leics/dataset/type2/single_after_pointcloud256,
             axis_path: /data3/leics/dataset/type2/single_after_axis,
-          npoint: 512},
+          npoint: 256},
   test : {  NAME: FullTeethDataset,
             train: False,
             file: files/second_stage/test.txt,
             # after_path: /data3/leics/dataset/type2/single_after_inside512,
-            after_path: /data3/leics/dataset/type2/single_after_pointcloud512,
+            after_path: /data3/leics/dataset/type2/single_after_pointcloud256,
             axis_path: /data3/leics/dataset/type2/single_after_axis,
-            npoint: 512}}
+            npoint: 256}}
 
 model : {
-  NAME: VoxelUNet,
-  zdim: 64,
-  npoint: 512,
-  resolution: 4,
-   local_encoder: {
+  NAME: DiffusionVAE,
+  vae: {
+    zdim: 64,
+    resolution: 4,
+    npoint: 256,
+    local_encoder: {
     zdim: 64,
     num_dense: 512,
     latent_dim: 512, 
@@ -49,13 +50,15 @@ model : {
     n_head: 8,
     grid_size: 4,
     depth: 12
-  },
+    }
+  }
 }
 
 
-npoints: 512
-total_bs : 16
-kl_weight: 0.5
+npoints: 128
+total_bs : 64
 step_per_update : 1
-max_epoch : 500
+max_epoch : 1000
 grad_norm_clip : 10
+before_mesh_path: /data3/leics/dataset/type2/single_before
+after_mesh_path: /data3/leics/dataset/type2/single_after

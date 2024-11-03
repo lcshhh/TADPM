@@ -17,30 +17,30 @@ dataset : {
             train: True,
             file: files/second_stage/train.txt,
             # after_path: /data3/leics/dataset/type2/single_after_inside512,
-            after_path: /data3/leics/dataset/type2/single_after_pointcloud512,
+            after_path: /data3/leics/dataset/type2/single_after_pointcloud256,
             axis_path: /data3/leics/dataset/type2/single_after_axis,
-            npoint: 512
+            npoint: 256
             },
   val : { NAME: FullTeethDataset,
           train: False,
           file: files/second_stage/test.txt,
           # after_path: /data3/leics/dataset/type2/single_after_inside512,
-          after_path: /data3/leics/dataset/type2/single_after_pointcloud512,
+          after_path: /data3/leics/dataset/type2/single_after_pointcloud256,
             axis_path: /data3/leics/dataset/type2/single_after_axis,
-          npoint: 512},
+          npoint: 256},
   test : {  NAME: FullTeethDataset,
             train: False,
             file: files/second_stage/test.txt,
             # after_path: /data3/leics/dataset/type2/single_after_inside512,
-            after_path: /data3/leics/dataset/type2/single_after_pointcloud512,
+            after_path: /data3/leics/dataset/type2/single_after_pointcloud256,
             axis_path: /data3/leics/dataset/type2/single_after_axis,
-            npoint: 512}}
+            npoint: 256}}
 
 model : {
   NAME: VoxelUNet,
   zdim: 64,
-  npoint: 512,
   resolution: 4,
+  npoint: 256,
    local_encoder: {
     zdim: 64,
     num_dense: 512,
@@ -53,8 +53,8 @@ model : {
 }
 
 
-npoints: 512
-total_bs : 16
+npoints: 128
+total_bs : 32
 kl_weight: 0.5
 step_per_update : 1
 max_epoch : 500

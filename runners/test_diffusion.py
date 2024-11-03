@@ -193,17 +193,18 @@ def test_diffusion(args, config, logger):
     losses = AverageMeter(['loss'])
     with torch.no_grad():
         for idx, (index,point,centers,axis,masks) in enumerate(test_dataloader):
+            batch = index.shape[0]
             point = point.cuda().float()
             centers = centers.cuda().float()
             axis = axis.cuda().float()
             masks = masks.cuda()
             batch = point.shape[0]
             generated_points, masks = base_model.module.sample(batch)
-            masks[masks>0.3] = 1
-            masks[masks<0.3] = 0
+            masks[masks>0.5] = 1
+            masks[masks<0.5] = 0
             generated_points = generated_points * masks[:,:,None,None]
             generated_points = rearrange(generated_points,'b n p c -> b (n p) c')
-            
+
             ### syn
             # generated_points = rearrange(generated_points,'b (n p) c -> b n p c',n=32)
             # batch_idx = 10
@@ -217,7 +218,7 @@ def test_diffusion(args, config, logger):
             
             # diffusion loss
             criterion = nn.MSELoss()
-            for i in range(64):
+            for i in range(batch):
                 write_pointcloud(generated_points[i].cpu().numpy(),f'/data3/leics/dataset/tmp/test{i}.ply')
             exit()
 

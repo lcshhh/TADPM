@@ -13,7 +13,7 @@ from models import *
 import torch
 
 # implement the global encoder for VAE model 
-
+@MODELS.register_module()
 class PointNetPlusEncoder(nn.Module):
     sa_blocks = [
         [[32, 2, 32], [1024, 0.1, 32, [32, 32]]],

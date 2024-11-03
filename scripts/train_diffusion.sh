@@ -1,9 +1,9 @@
 ENT="python third_stage.py "
-cfg="config/DiffusionVAE.yaml"
-saveroot="/data3/leics/dataset/checkpoints/diffusion"
-exp_name="diffusionmask_surface4"
+cfg="config/DiffusionVAE_256.yaml"
+saveroot="/data3/leics/dataset/checkpoints/diffusion256"
+exp_name="diffusionmask_surface"
 launcher="none"
-vae_checkpoint="/data3/leics/dataset/checkpoints/voxel/mask_surface4_64/ckpt-last.pth"
+vae_checkpoint="/data3/leics/dataset/checkpoints/voxel256/mask_surface/ckpt-last.pth"
 
 
 

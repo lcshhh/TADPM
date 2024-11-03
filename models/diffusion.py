@@ -67,7 +67,6 @@ class diffusion(nn.Module):
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
         self.model = DiffusionUNet(64,64)
         # self.model = UViT()
-        # self.model = ResidualUNetSE3D(32,32)
         self.eta = 1
         self.sqrt_alphas_cumprod =  torch.sqrt(self.alphas_cumprod)
         self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1-self.alphas_cumprod)

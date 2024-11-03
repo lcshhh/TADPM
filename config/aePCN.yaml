@@ -1,7 +1,7 @@
 optimizer : {
   type: AdamW,
   kwargs: {
-  lr : 0.001,
+  lr : 0.0003,
   weight_decay : 0.05
 }}
 
@@ -37,9 +37,12 @@ dataset : {
             npoint: 512}}
 
 model : {
-  NAME: VoxelUNet,
+  NAME: VoxelPCNUNet,
   zdim: 64,
+  num_dense: 512,
+  grid_size: 2,
   npoint: 512,
+  latent_dim: 4096,
   resolution: 4,
    local_encoder: {
     zdim: 64,

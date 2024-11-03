@@ -120,7 +120,7 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
         batch_start_time = time.time()
         batch_time = AverageMeter()
         data_time = AverageMeter()
-        losses = AverageMeter(['loss'])
+        losses = AverageMeter(['loss','rec','diff','mask'])
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
 
@@ -137,8 +137,8 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
 
             rec_loss = torch.stack([chamfer_distance(point[:,i],rec[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
             criterion = nn.MSELoss()
-            # rec_loss = (rec_loss * masks).mean()
-            # mask_loss = 10*criterion(masks.float(),predicted_masks)
+            rec_loss = (rec_loss * masks).mean()
+            mask_loss = 10*criterion(masks.float(),predicted_masks)
 
             # # diffusion loss
             # criterion = nn.MSELoss()
@@ -150,13 +150,13 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
 
             loss.backward()
             optimizer.step()
-            losses.update([loss.item()])
+            losses.update([loss.item(),rec_loss.item(),diff_loss.item(),mask_loss.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
             
             if idx % 5 == 0:
-                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss= %s lr = %.6f' %
+                logger.info('[Epoch %d/%d][Batch %d/%d] BatchTime = %.3f (s) DataTime = %.3f (s) Loss rec diff mask= %s lr = %.6f' %
                             (epoch, config.max_epoch, idx + 1, n_batches, batch_time.val(), data_time.val(),
                             ['%.4f' % l for l in losses.val()], optimizer.param_groups[0]['lr']))
         if isinstance(scheduler, list):
@@ -171,7 +171,7 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
 
         # print_log('[Training] EPOCH: %d EpochTime = %.3f (s) Losses = %s lr = %.6f' %
         #     (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']), logger = logger)
-        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss = %s lr = %.6f' %
+        logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss rec diff mask = %s lr = %.6f' %
             (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']))
 
         if epoch % args.val_freq == 0 and epoch != 0:
@@ -194,7 +194,7 @@ def train_diffusion(args, config, train_writer, val_writer, logger):
 def validate(base_model, test_dataloader, epoch, val_writer, args, config, logger = None):
     logger.info(f"[VALIDATION] Start validating epoch {epoch}")
     base_model.eval()  # set model to eval mode
-    losses = AverageMeter(['loss'])
+    losses = AverageMeter(['loss','rec','diff','mask'])
     with torch.no_grad():
         for idx, (index,point,centers,axis,masks) in enumerate(test_dataloader):
             point = point.cuda().float()
@@ -206,17 +206,17 @@ def validate(base_model, test_dataloader, epoch, val_writer, args, config, logge
             rec_loss = torch.stack([chamfer_distance(point[:,i],rec[:,i],point_reduction='sum',batch_reduction=None)[0] for i in range(32)],dim=1)
             criterion = nn.MSELoss()
             rec_loss = (rec_loss * masks).mean()
-            mask_loss = criterion(masks.float(),predicted_masks)
+            mask_loss = 10*criterion(masks.float(),predicted_masks)
 
             # diffusion loss
             criterion = nn.MSELoss()
             diff_loss = criterion(latents,predicted_latents)
-            # loss = rec_loss + mask_loss + diff_loss
-            loss = diff_loss
+            loss = rec_loss
+            # loss = diff_loss
 
-            losses.update([loss.item()])
+            losses.update([loss.item(),rec_loss.item(),diff_loss.item(),mask_loss.item()])
 
-        logger.info('[Validation] EPOCH: %d  Loss = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
+        logger.info('[Validation] EPOCH: %d  Loss rec diff mask = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
 
 
     # Add testing results to TensorBoard
