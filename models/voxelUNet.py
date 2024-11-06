@@ -67,8 +67,8 @@ class VoxelUNet(nn.Module):
         # )
         self.unet_decoder = ResidualUNetSE3D(config.zdim,config.zdim,final_sigmoid=False,is_segmentation=False,dropout_prob=0.7)
         self.final_dim = (self.resolution ** 3) * config.zdim
-        # self.mlps = nn.ModuleList([nn.Linear(self.final_dim,self.npoint*3) for _ in range(32)])
-        self.mlps = nn.ModuleList([MLP(self.final_dim,self.npoint) for _ in range(32)])
+        self.mlps = nn.ModuleList([nn.Linear(self.final_dim,self.npoint*3) for _ in range(32)])
+        # self.mlps = nn.ModuleList([MLP(self.final_dim,self.npoint) for _ in range(32)])
         self.mask_predictor = nn.ModuleList([nn.Linear(self.final_dim,1) for _ in range(32)])
 
     def forward(self, points):
