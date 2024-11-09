@@ -192,7 +192,7 @@ def test_diffusion(args, config, logger):
     num = 0
     losses = AverageMeter(['loss'])
     with torch.no_grad():
-        for round in range(10):
+        for round in range(1):
             for idx, (index,point,centers,axis,masks) in enumerate(test_dataloader):
                 batch = index.shape[0]
                 point = point.cuda().float()
@@ -222,7 +222,7 @@ def test_diffusion(args, config, logger):
                 for i in range(batch):
                     for j in range(32):
                         if masks[i][j] > 0.5:
-                            write_pointcloud(generated_points[i][j].cpu().numpy(),f'/data3/leics/dataset/synthetic/after2/{num+i}_{j}.ply')
+                            write_pointcloud(generated_points[i][j].cpu().numpy(),f'/data3/leics/dataset/synthetic/after3/{num+i}_{j}.ply')
                 break
             num += batch
                 # write_pointcloud(generated_points[i].cpu().numpy(),f'/data3/leics/dataset/synthetic/before/test{i}.ply')
