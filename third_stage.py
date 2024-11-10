@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 from datasets import *
 from models import *
 from runners.train_diffusion import train_diffusion
-from runners.test_diffusion import test_diffusion
+from runners.test_diffusion import test_diffusion,sample_diffusion
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -48,6 +48,11 @@ def get_args():
         action='store_true', 
         default=False, 
         help = 'test mode for certain ckpt')
+    parser.add_argument(
+        '--sample', 
+        action='store_true', 
+        default=False, 
+        help = 'sample mode for certain ckpt')
     parser.add_argument(
         '--finetune_model', 
         action='store_true', 
@@ -116,6 +121,8 @@ def main():
     # run
     if args.test:
         test_diffusion(args, config, logger)
+    elif args.sample:
+        sample_diffusion(args, config, logger)
     else:
         train_diffusion(args, config, train_writer, val_writer, logger)
 
