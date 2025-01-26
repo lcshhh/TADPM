@@ -193,7 +193,7 @@ def test_diffusion(args, config, logger):
     num = 0
     losses = AverageMeter(['loss'])
     with torch.no_grad():
-        for round in range(1):
+        for round in range(10):
             for idx, (index,point,centers,axis,masks) in enumerate(test_dataloader):
                 batch = index.shape[0]
                 point = point.cuda().float()
@@ -202,10 +202,15 @@ def test_diffusion(args, config, logger):
                 masks = masks.cuda()
                 batch = point.shape[0]
                 generated_points, masks = base_model.module.sample(batch)
+                # generated_points = rearrange(generated_points,'b n p c -> b (n p) c')
                 masks[masks>0.5] = 1
                 masks[masks<0.5] = 0
                 generated_points = generated_points * masks[:,:,None,None]
-                # generated_points = rearrange(generated_points,'b n p c -> b (n p) c')
+                for i in range(batch):
+                    for j in range(32):
+                        if masks[i][j] > 0.5:
+                            write_pointcloud(generated_points[i][j].cpu().numpy(),f'/data3/leics/dataset/synthetic/after6/{num+i}_{j}.ply')
+                break
 
                 ### syn
                 # generated_points = rearrange(generated_points,'b (n p) c -> b n p c',n=32)
@@ -220,11 +225,19 @@ def test_diffusion(args, config, logger):
                 
                 # diffusion loss
                 criterion = nn.MSELoss()
-                for i in range(batch):
-                    for j in range(32):
-                        if masks[i][j] > 0.5:
-                            write_pointcloud(generated_points[i][j].cpu().numpy(),f'/data3/leics/dataset/synthetic/after3/{num+i}_{j}.ply')
-                break
+                # for i in range(batch):
+                #     for j in range(32):
+                #         # if masks[i][j] > 0.5:
+                #             write_pointcloud(generated_points[i][j].cpu().numpy(),f'/data3/leics/dataset/test512/single_before/{num+i}_{j}.ply')
+                # # generated_points = rearrange(generated_points,'b n p c -> b (n p) c')
+                # masks[masks>0.5] = 1
+                # masks[masks<0.5] = 0
+                # generated_points = generated_points * masks[:,:,None,None]
+                # for i in range(batch):
+                #     for j in range(32):
+                #         if masks[i][j] > 0.5:
+                #             write_pointcloud(generated_points[i][j].cpu().numpy(),f'/data3/leics/dataset/test512/single_after/{num+i}_{j}.ply')
+                # break
             num += batch
                 # write_pointcloud(generated_points[i].cpu().numpy(),f'/data3/leics/dataset/synthetic/before/test{i}.ply')
 
@@ -267,12 +280,14 @@ def sample_diffusion(args, config, logger):
             masks[masks<0.5] = 1/1000
             generated_points = generated_points * masks[:,:,None,None]
             generated_points = rearrange(generated_points,'b n p c -> b (n p) c')
+            # write_pointcloud(generated_points[0].cpu().numpy(),'/data3/leics/dataset/test.ply')
+            # exit()
             gen_points.append(generated_points)
 
         gt_points = torch.cat(gt_points,dim=0)
         gen_points = torch.cat(gen_points,dim=0)
         # compute_all_metrics(gt_points,gen_points,batch_size=8)
-        torch.save(gt_points,'/data3/leics/dataset/gt.pt')
-        torch.save(gen_points,'/data3/leics/dataset/gen.pt')
+        # torch.save(gt_points,'/data3/leics/dataset/gt.pt')
+        torch.save(gen_points,'/data3/leics/dataset/gen_res5.pt')
 
     # Add testing results to TensorBoard

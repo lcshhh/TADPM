@@ -118,6 +118,40 @@ class diffusion(nn.Module):
             xs.append(xt_next)
 
         return xs[-1]
+    
+    @torch.no_grad()
+    def ddim_sample_procedure(self, inputs):
+        batch = inputs.shape[0]
+        shape = inputs.shape
+        total_timesteps, sampling_timesteps, eta = self.timesteps, self.sampling_timesteps, self.eta
+
+        # [-1, 0, 1, 2, ..., T-1] when sampling_timesteps == total_timesteps
+        skip = self.timesteps // self.sampling_timesteps
+        seq = range(0, self.timesteps, skip)
+
+        # x = torch.randn(shape)
+        x = torch.randn(shape).cuda()
+        seq_next = [-1] + list(seq[:-1])
+        x0_preds = []
+        xs = [x]
+
+        for i, j in zip(reversed(seq), reversed(seq_next)):
+            t = (torch.ones(batch) * i).cuda()
+            next_t = (torch.ones(batch) * j).cuda()
+            at = compute_alpha(self.betas.to(t.device), t.long())
+            at_next = compute_alpha(self.betas.to(t.device), next_t.long())
+            xt = xs[-1].to(torch.float32)
+            temb = timestep_embedding(t,128)
+            x0_t = self.model(xt,temb)
+            et = (xt - x0_t * at.sqrt())/((1-at).sqrt())
+            c1 = (
+                self.eta * ((1 - at / at_next) * (1 - at_next) / (1 - at)).sqrt()
+            )
+            c2 = ((1 - at_next) - c1 ** 2).sqrt()
+            xt_next = at_next.sqrt() * x0_t + c1 * torch.randn_like(x) + c2 * et
+            xs.append(xt_next)
+
+        return xs
 
     
     def forward(self, batched_inputs):

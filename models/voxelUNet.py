@@ -9,6 +9,7 @@ from utils.builder import MODELS
 from einops import rearrange
 from models import *
 from models.voxelization import Voxelization
+from models.uvit import Block
 from vector_quantize_pytorch import FSQ, LFQ, ResidualVQ
 
 def patchify(features,resolution):
@@ -47,7 +48,10 @@ class VoxelUNet(nn.Module):
         super(VoxelUNet, self).__init__()
         self.resolution = config.resolution
         self.local_encoders = nn.ModuleList([PointNetEncoder(config.local_encoder) for _ in range(32)])
-        self.unet_encoder = ResidualUNetSE3D(config.zdim,config.zdim,final_sigmoid=False,is_segmentation=False,dropout_prob=0.7)
+        if self.resolution==3:
+            self.unet_encoder = ResidualUNetSE3D(config.zdim,config.zdim,final_sigmoid=False,is_segmentation=False,dropout_prob=0.7,num_levels=3)
+        else:
+            self.unet_encoder = ResidualUNetSE3D(config.zdim,config.zdim,final_sigmoid=False,is_segmentation=False,dropout_prob=0.7,num_levels=4)
         self.npoint = config.npoint
         # self.bn1 = nn.BatchNorm3d(config.zdim)
         # self.bn2 = nn.BatchNorm3d(config.zdim)
@@ -65,7 +69,10 @@ class VoxelUNet(nn.Module):
         #     kmeans_init = True,   # set to True
         #     kmeans_iters = 10     # number of kmeans iterations to calculate the centroids for the codebook on init
         # )
-        self.unet_decoder = ResidualUNetSE3D(config.zdim,config.zdim,final_sigmoid=False,is_segmentation=False,dropout_prob=0.7)
+        if self.resolution == 3:
+            self.unet_decoder = ResidualUNetSE3D(config.zdim,config.zdim,final_sigmoid=False,is_segmentation=False,dropout_prob=0.7,num_levels=3)
+        else:
+            self.unet_decoder = ResidualUNetSE3D(config.zdim,config.zdim,final_sigmoid=False,is_segmentation=False,dropout_prob=0.7,num_levels=4)
         self.final_dim = (self.resolution ** 3) * config.zdim
         self.mlps = nn.ModuleList([nn.Linear(self.final_dim,self.npoint*3) for _ in range(32)])
         # self.mlps = nn.ModuleList([MLP(self.final_dim,self.npoint) for _ in range(32)])
@@ -77,15 +84,11 @@ class VoxelUNet(nn.Module):
         """
         features = torch.stack([self.local_encoders[i].encode(points[:,i]) for i in range(32)],dim=2)  # [B,C,N,P]
         features = patchify(features,self.resolution)
-        # features = self.bn1(features)
         z = self.unet_encoder(features)
         z = rearrange(z,'b c w h d -> b (w h d) c')
         z, indices, entropy_aux_loss = self.quantizer(z) 
         z = rearrange(z,'b (w h d) c -> b c w h d',w=2*self.resolution,h=2*self.resolution,d=8*self.resolution)
-        # entropy_aux_loss = torch.FloatTensor([0.]).cuda()
-        # z = self.bn2(features)
         decoded = unpatchify(self.unet_decoder(z),self.resolution)
-        # rec = self.mlp(decoded)
         rec = torch.stack([self.mlps[i](decoded[:,i]) for i in range(32)],dim=1)
         masks = torch.stack([self.mask_predictor[i](decoded[:,i]) for i in range(32)],dim=1).squeeze(2)
         rec = rearrange(rec,'b n (p c)-> b n p c',c=3)

@@ -96,6 +96,7 @@ def test_global(args, config, logger):
     base_model.eval()  # set model to eval mode
 
     losses = AverageMeter(['loss','rec'])
+    vanilla_points = []
     with torch.no_grad():
         for idx, (index,point,centers,axis,masks) in enumerate(test_dataloader):
             point = point.cuda().float()
@@ -112,12 +113,16 @@ def test_global(args, config, logger):
             outputs = outputs * masks.unsqueeze(2).unsqueeze(3)
             outputs = rearrange(outputs,'b n p c -> b (n p) c')
             point = rearrange(point,'b n p c -> b (n p) c')
+            # vanilla_points.append(outputs)
             for i in range(point.shape[0]):
                 write_pointcloud(point[i].cpu().numpy(),f'/data3/leics/dataset/test_global/before{i}.ply')
                 write_pointcloud(outputs[i].cpu().numpy(),f'/data3/leics/dataset/test_global/after{i}.ply')
             exit()
 
         logger.info('[TEST] Loss rec_loss kl_loss = %s' % (['%.4f' % l for l in losses.avg()]))
+        # vanilla_points = torch.cat(vanilla_points,dim=0)
+        # print(vanilla_points.shape)
+        # torch.save(vanilla_points,'/data3/leics/dataset/vanilla.pt')
 
 
     # Add testing results to TensorBoard

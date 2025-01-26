@@ -378,8 +378,8 @@ def _jsdiv(P, Q):
 
 
 if __name__=='__main__':
-    a = torch.load('/data3/leics/dataset/full.pt').cuda()[:400].float()
-    b = torch.load('/data3/leics/dataset/dit.pt').cuda()[:400]
+    a = torch.load('/data3/leics/dataset/gen_res5.pt').cuda()[:400].float()
+    b = torch.load('/data3/leics/dataset/gt.pt').cuda()[:400]
     # a = torch.randn([16, 4096, 3]).cuda()
     # b = torch.randn([16, 4096, 3]).cuda()
     print(compute_all_metrics(a, b, batch_size=100))

@@ -34,10 +34,10 @@ class DiffusionVAE(nn.Module):
         # input_latents = rearrange(latents,'b c w h d -> b (w h d) c')
         predicted_latents = self.dpm(latents)
         # predicted_latents = rearrange(predicted_latents,'b (w h d) c -> b c w h d',w=2*self.resolution,h=2*self.resolution,d=8*self.resolution)
-        rec, masks = self.vae.decode(predicted_latents)
+        # rec, masks = self.vae.decode(predicted_latents)
         
         # out = out.view(B, 512, C)
-        return latents,  predicted_latents, rec, masks
+        return latents,  predicted_latents
 
         # for point-wise decoder
         z_clone = z.clone().detach()
@@ -61,6 +61,7 @@ class DiffusionVAE(nn.Module):
         predicted_latents = self.dpm.ddim_sample(z).float()
         points, masks = self.vae.decode(predicted_latents)
         return points, masks
+    
 
 
 

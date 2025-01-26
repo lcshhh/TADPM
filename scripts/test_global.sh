@@ -1,7 +1,8 @@
 ENT="python second_stage.py "
-cfg="config/ae_256.yaml"
+cfg="config/ae_128.yaml"
 #内部点事mask, 表面是mask_surface
-ckpts="/data3/leics/dataset/checkpoints/voxel256/mask_surface/ckpt-last.pth"
+# ckpts="/data3/leics/dataset/checkpoints/voxel256/mask_surface/ckpt-last.pth"
+ckpts="/data3/leics/dataset/checkpoints/voxel128/resolution5/ckpt-best.pth"
 saveroot="/data3/leics/dataset/checkpoints/global"
 exp_name="vqvae"
 launcher="none"
