@@ -277,11 +277,11 @@ def sample_diffusion(args, config, logger):
 
             generated_points, masks = base_model.module.sample(batch)
             masks[masks>0.5] = 1
-            masks[masks<0.5] = 1/1000
+            masks[masks<0.5] = 0
             generated_points = generated_points * masks[:,:,None,None]
             generated_points = rearrange(generated_points,'b n p c -> b (n p) c')
-            # write_pointcloud(generated_points[0].cpu().numpy(),'/data3/leics/dataset/test.ply')
-            # exit()
+            write_pointcloud(generated_points[0].cpu().numpy(),'/data3/leics/dataset/test.ply')
+            exit()
             gen_points.append(generated_points)
 
         gt_points = torch.cat(gt_points,dim=0)

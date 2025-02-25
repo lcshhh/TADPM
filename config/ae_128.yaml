@@ -39,8 +39,9 @@ dataset : {
 model : {
   NAME: VoxelUNet,
   zdim: 64,
-  resolution: 3,
+  resolution: 4,
   npoint: 128,
+  num_heads: 8,
    local_encoder: {
     zdim: 64,
     num_dense: 512,
@@ -54,7 +55,7 @@ model : {
 
 
 npoints: 128
-total_bs : 24
+total_bs : 32
 kl_weight: 0.5
 step_per_update : 1
 max_epoch : 500

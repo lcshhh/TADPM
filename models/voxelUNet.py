@@ -53,6 +53,7 @@ class VoxelUNet(nn.Module):
         else:
             self.unet_encoder = ResidualUNetSE3D(config.zdim,config.zdim,final_sigmoid=False,is_segmentation=False,dropout_prob=0.7,num_levels=4)
         self.npoint = config.npoint
+        self.blocks = nn.ModuleList([nn.TransformerEncoderLayer(d_model=config.zdim, nhead=8) for _ in range(12)])
         # self.bn1 = nn.BatchNorm3d(config.zdim)
         # self.bn2 = nn.BatchNorm3d(config.zdim)
         self.quantizer = LFQ(
@@ -73,7 +74,7 @@ class VoxelUNet(nn.Module):
             self.unet_decoder = ResidualUNetSE3D(config.zdim,config.zdim,final_sigmoid=False,is_segmentation=False,dropout_prob=0.7,num_levels=3)
         else:
             self.unet_decoder = ResidualUNetSE3D(config.zdim,config.zdim,final_sigmoid=False,is_segmentation=False,dropout_prob=0.7,num_levels=4)
-        self.final_dim = (self.resolution ** 3) * config.zdim
+        self.final_dim = config.zdim
         self.mlps = nn.ModuleList([nn.Linear(self.final_dim,self.npoint*3) for _ in range(32)])
         # self.mlps = nn.ModuleList([MLP(self.final_dim,self.npoint) for _ in range(32)])
         self.mask_predictor = nn.ModuleList([nn.Linear(self.final_dim,1) for _ in range(32)])
@@ -82,15 +83,17 @@ class VoxelUNet(nn.Module):
         """
         points: [B, N, P, 3]
         """
-        features = torch.stack([self.local_encoders[i].encode(points[:,i]) for i in range(32)],dim=2)  # [B,C,N,P]
-        features = patchify(features,self.resolution)
-        z = self.unet_encoder(features)
-        z = rearrange(z,'b c w h d -> b (w h d) c')
-        z, indices, entropy_aux_loss = self.quantizer(z) 
-        z = rearrange(z,'b (w h d) c -> b c w h d',w=2*self.resolution,h=2*self.resolution,d=8*self.resolution)
-        decoded = unpatchify(self.unet_decoder(z),self.resolution)
-        rec = torch.stack([self.mlps[i](decoded[:,i]) for i in range(32)],dim=1)
-        masks = torch.stack([self.mask_predictor[i](decoded[:,i]) for i in range(32)],dim=1).squeeze(2)
+        features = torch.stack([self.local_encoders[i].encode(points[:,i]) for i in range(32)],dim=1)  # [B,N,C]
+        for block in self.blocks:
+            features =  block(features)
+        # features = patchify(features,self.resolution)
+        # z = self.unet_encoder(features)
+        # z = rearrange(z,'b c w h d -> b (w h d) c')
+        z, indices, entropy_aux_loss = self.quantizer(features) 
+        # z = rearrange(z,'b (w h d) c -> b c w h d',w=2*self.resolution,h=2*self.resolution,d=8*self.resolution)
+        # decoded = unpatchify(self.unet_decoder(z),self.resolution)
+        rec = torch.stack([self.mlps[i](z[:,i]) for i in range(32)],dim=1)
+        masks = torch.stack([self.mask_predictor[i](z[:,i]) for i in range(32)],dim=1).squeeze(2)
         rec = rearrange(rec,'b n (p c)-> b n p c',c=3)
         return rec, entropy_aux_loss, masks
     
