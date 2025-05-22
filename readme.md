@@ -41,7 +41,7 @@ bash scripts/remesh.sh
 
 - To get ground truth rotation parameters, you can either use the **Kabsch algorithm** to obtain an accurate rotation matrix(If the points on your pre- and post-orthodontic jaw models can be matched one by one) or use **ICP algorithm** to obtain an approximate rotation matrix.
 
-  You need to save the rotation parameters for each dental model in a separate file. Each file should contain a tensor of shape [32, 3, 3], where each [3, 3] matrix corresponds to the rotation matrix of an individual tooth.
+  You need to save the rotation parameters for each dental model in a separate pkl file. Each file should contain a tensor of shape [32, 3, 3], where each [3, 3] matrix corresponds to the rotation matrix of an individual tooth. **All the files should be placed under the paramroot.**
 
 ### Pretrain
 
