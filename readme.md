@@ -43,6 +43,31 @@ bash scripts/remesh.sh
 
   You need to save the rotation parameters for each dental model in a separate pkl file. Each file should contain a tensor of shape [32, 3, 3], where each [3, 3] matrix corresponds to the rotation matrix of an individual tooth. **All the files should be placed under the paramroot.**
 
+  Here is an example of the Kabsch algorithm:
+
+  ```python
+  # you need to implement the remaining code
+  def kabsch_algorithm(A, B):
+      assert A.shape == B.shape
+      
+      A_mean = A - np.mean(A, axis=0)
+      B_mean = B - np.mean(B, axis=0)
+  
+      H = np.dot(A_mean.T, B_mean)
+  
+      U, S, Vt = np.linalg.svd(H)
+  
+      R = np.dot(Vt.T, U.T)
+  
+      if np.linalg.det(R) < 0:
+          Vt[2, :] *= -1
+          R = np.dot(Vt.T, U.T)
+  
+      return R
+  ```
+
+  For the ICP algorithm, you can directly use the interface provided by the `trimesh` library.
+
 ### Pretrain
 
 - To pretrain MeshMAE:
