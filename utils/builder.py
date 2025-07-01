@@ -122,14 +122,13 @@ def resume_optimizer(optimizer, args, logger = None):
     optimizer.load_state_dict(state_dict['optimizer'])
 
 def save_checkpoint(base_model, optimizer, epoch, best_metrics, prefix, args, logger = None):
-    if args.local_rank == 0:
-        torch.save({
-                    'base_model' : base_model.module.state_dict() ,
-                    'optimizer' : optimizer.state_dict(),
-                    'epoch' : epoch,
-                    'best_metrics' : best_metrics,
-                    }, os.path.join(args.experiment_path, prefix + '.pth'))
-        logger.info(f"Save checkpoint at {os.path.join(args.experiment_path, prefix + '.pth')}")
+    torch.save({
+                'base_model' : base_model.module.state_dict() ,
+                'optimizer' : optimizer.state_dict(),
+                'epoch' : epoch,
+                'best_metrics' : best_metrics,
+                }, os.path.join(args.experiment_path, prefix + '.pth'))
+    logger.info(f"Save checkpoint at {os.path.join(args.experiment_path, prefix + '.pth')}")
 
 def load_model_from_ckpt(model,ckpt_path):
     state_dict = torch.load(ckpt_path)

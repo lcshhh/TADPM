@@ -1,15 +1,16 @@
-ENT="python first_stage.py "
-cfg="config/PCN.yaml"
-saveroot="/data3/leics/dataset/teeth_full/single_checkpoints"
-ckpts="/data3/leics/dataset/teeth_full/single_checkpoints/PCN2_512/ckpt-best.pth"
-exp_name="PCN"
-launcher="none"
+ENT="python main.py "
+cfg="config/TADPM.yaml"
+saveroot="/data3/leics/dataset/checkpoints/tadpm_new"
+encoder_ckpts="/data3/leics/dataset/checkpoints/MeshMAE/resume/ckpt-best.pth"
+ckpts="/data3/leics/dataset/checkpoints/tadpm_new/tadpm_resume/ckpt-best.pth"
+exp_name="mlp"
 
 
 
 $ENT --config $cfg \
-    --launcher $launcher \
-    --ckpts $ckpts \
     --save_root $saveroot \
     --exp_name $exp_name \
+    --encoder_ckpts $encoder_ckpts \
+    --ckpts $ckpts \
     --test
+

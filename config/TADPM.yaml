@@ -1,0 +1,45 @@
+optimizer: { type: AdamW, kwargs: { lr: 0.00001, weight_decay: 0.05 } }
+
+scheduler: { type: CosLR, kwargs: { epochs: 100, initial_epochs: 3 } }
+
+dataset : {
+  train : { NAME: DentalDataset,
+            train: True,
+            dataroot: /data3/leics/dataset/type2_process_final/remesh_before,  
+            paramroot: /data3/leics/dataset/type2_process_final/param,
+            before_path: /data3/leics/dataset/type2_process_final/pcd_before512,
+            after_path: /data3/leics/dataset/type2_process_final/pcd_after512,
+            npoint: 512,
+            file: files/second_stage/train.txt,
+            },
+  val : { NAME: DentalDataset,
+            train: True,
+            dataroot: /data3/leics/dataset/type2_process_final/remesh_before,  
+            paramroot: /data3/leics/dataset/type2_process_final/param,
+            before_path: /data3/leics/dataset/type2_process_final/pcd_before512,
+            after_path: /data3/leics/dataset/type2_process_final/pcd_after512,
+            npoint: 512,
+            file: files/second_stage/test.txt,
+            },
+  test : { NAME: DentalDataset,
+            train: True,
+            dataroot: /data3/leics/dataset/type2_process_final/remesh_before,  
+            paramroot: /data3/leics/dataset/type2_process_final/param,
+            before_path: /data3/leics/dataset/type2_process_final/pcd_before512,
+            after_path: /data3/leics/dataset/type2_process_final/pcd_after512,
+            npoint: 512,
+            file: files/second_stage/test.txt,
+            }}
+
+model:
+  {
+    NAME: TADPM,
+    dim: 768,
+    depth: 12,
+    num_heads: 8,
+  }
+
+npoints: 512
+total_bs: 24
+step_per_update: 1
+max_epoch: 100

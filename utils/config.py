@@ -55,7 +55,7 @@ def get_config(args, logger=None):
         logger.info(f'Resume yaml from {cfg_path}')
         args.config = cfg_path
     config = cfg_from_yaml_file(args.config)
-    if not args.resume and args.local_rank == 0:
+    if not args.resume:
         save_experiment_config(args, config, logger)
     return config
 

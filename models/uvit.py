@@ -5,20 +5,17 @@ import timm
 from timm.models.layers import trunc_normal_
 from timm.models.vision_transformer import Mlp
 import einops
-from einops import rearrange
 import torch.utils.checkpoint
-from pytorch3d.transforms import euler_angles_to_matrix, rotation_6d_to_matrix
 
-if hasattr(torch.nn.functional, 'scaled_dot_product_attention'):
-    ATTENTION_MODE = 'flash'
-else:
-    try:
-        import xformers
-        import xformers.ops
-        ATTENTION_MODE = 'xformers'
-    except:
-        ATTENTION_MODE = 'math'
-print(f'attention mode is {ATTENTION_MODE}')
+# the xformers lib allows less memory, faster training and inference
+# try:
+#     import xformers
+#     import xformers.ops
+#     XFORMERS_IS_AVAILBLE = True
+#     print('xformers enabled')
+# except:
+XFORMERS_IS_AVAILBLE = False
+print('xformers disabled')
 
 
 def timestep_embedding(timesteps, dim, max_period=10000):
@@ -48,12 +45,44 @@ def patchify(imgs, patch_size):
 
 
 def unpatchify(x, channels=3):
-    # patch_size = int((x.shape[2] // channels) ** 0.5)
-    w = 8
+    patch_size = 2
     h = 1
+    w = x.shape[1] // h
+    # w = x.shape[1] // h
+    # h = w = int(x.shape[1] ** .5)
     # assert h * w == x.shape[1] and patch_size ** 2 * channels == x.shape[2]
-    x = einops.rearrange(x, 'B (h w) (p1 p2 C) -> B C (w p2) (h p1)', h=h, p1=2, p2=2)
+    # x = einops.rearrange(x, 'B (h w) (p1 p2 C) -> B C (h p1) (w p2)', h=h, p1=patch_size, p2=patch_size)
+    x = einops.rearrange(x, 'B w (p C) -> B C (w p)', p=patch_size)
     return x
+
+class PatchEmbed(nn.Module):
+    """ 2D Image to Patch Embedding
+    """
+    def __init__(self, img_size=6, patch_size=2, in_chans=1, embed_dim=768, norm_layer=None, flatten=True):
+        super().__init__()
+        # self.img_size = img_size
+        # self.patch_size = patch_size
+        self.grid_size = int(img_size/patch_size)
+        self.num_patches = self.grid_size
+        self.flatten = flatten
+
+        # self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.proj = nn.Conv1d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
+
+    def forward(self, x):
+        # B, C, H, W = x.shape
+        # assert(H == self.img_size[0], f"Input image height ({H}) doesn't match model ({self.img_size[0]}).")
+        # assert(W == self.img_size[1], f"Input image width ({W}) doesn't match model ({self.img_size[1]}).")
+        # x = x.unsqueeze(1)
+        print(1,x.shape)
+        x = self.proj(x)
+        print(2,x.shape)
+        if self.flatten:
+            # x = x.flatten(2).transpose(1, 2)  # BCHW -> BNC
+            x = x.transpose(1, 2)
+        x = self.norm(x)
+        return x
 
 
 class Attention(nn.Module):
@@ -72,25 +101,18 @@ class Attention(nn.Module):
         B, L, C = x.shape
 
         qkv = self.qkv(x)
-        if ATTENTION_MODE == 'flash':
-            qkv = einops.rearrange(qkv, 'B L (K H D) -> K B H L D', K=3, H=self.num_heads).float()
-            q, k, v = qkv[0], qkv[1], qkv[2]  # B H L D
-            x = torch.nn.functional.scaled_dot_product_attention(q, k, v)
-            x = einops.rearrange(x, 'B H L D -> B L (H D)')
-        elif ATTENTION_MODE == 'xformers':
+        if False: # XFORMERS_IS_AVAILBLE:  # the xformers lib allows less memory, faster training and inference
             qkv = einops.rearrange(qkv, 'B L (K H D) -> K B L H D', K=3, H=self.num_heads)
             q, k, v = qkv[0], qkv[1], qkv[2]  # B L H D
             x = xformers.ops.memory_efficient_attention(q, k, v)
             x = einops.rearrange(x, 'B L H D -> B L (H D)', H=self.num_heads)
-        elif ATTENTION_MODE == 'math':
+        else:
             qkv = einops.rearrange(qkv, 'B L (K H D) -> K B H L D', K=3, H=self.num_heads)
             q, k, v = qkv[0], qkv[1], qkv[2]  # B H L D
             attn = (q @ k.transpose(-2, -1)) * self.scale
             attn = attn.softmax(dim=-1)
             attn = self.attn_drop(attn)
             x = (attn @ v).transpose(1, 2).reshape(B, L, C)
-        else:
-            raise NotImplemented
 
         x = self.proj(x)
         x = self.proj_drop(x)
@@ -125,51 +147,17 @@ class Block(nn.Module):
         return x
 
 
-class PatchEmbed(nn.Module):
-    """ Image to Patch Embedding
-    """
-    def __init__(self, patch_size=2, in_chans=9, embed_dim=768):
-        super().__init__()
-        self.patch_size = patch_size
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
-
-    def forward(self, x):
-        B, C, H, W = x.shape
-        x = self.proj(x).flatten(2).transpose(1, 2)
-        return x
-
-def pre_handle(poses):
-    """
-    Instead of making 2nd vector orthogonal to first
-    create a base that takes into account the two predicted
-    directions equally
-    """
-    # x_raw = poses[:, 0:3]  # batch*3
-    # y_raw = poses[:, 3:6]  # batch*3
-
-    # x = torch.nn.functional.normalize(x_raw,dim=-1)  # batch*3
-    # y = torch.nn.functional.normalize(y_raw)  # batch*3
-    # middle = torch.nn.functional.normalize(x + y)
-    # orthmid = torch.nn.functional.normalize(x - y)
-    # x = torch.nn.functional.normalize(middle + orthmid)
-    # y = torch.nn.functional.normalize(mviddle - orthmid)
-    
-    # matrix = torch.cat((x, y), 1)  # batch*3*3
-    matrix = rotation_6d_to_matrix(poses).flatten(1,2)
-    return matrix[:,:6]
-
-
 class UViT(nn.Module):
-    def __init__(self, patch_size=2, in_chans=9, embed_dim=64, depth=12, num_heads=8, mlp_ratio=4.,
-                 qkv_bias=True, qk_scale=None, norm_layer=nn.LayerNorm, mlp_time_embed=True, num_classes=-1,
-                 use_checkpoint=False, conv=False, skip=True):
+    def __init__(self, img_size=6, patch_size=2, in_chans=16, embed_dim=27, depth=12, num_heads=9, mlp_ratio=4.,
+                 qkv_bias=False, qk_scale=None, norm_layer=nn.LayerNorm, mlp_time_embed=False, use_checkpoint=False,
+                 num_clip_token=16, conv=True, skip=True, use_ae=False):
         super().__init__()
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
-        self.num_classes = num_classes
         self.in_chans = in_chans
-
-        self.patch_embed = PatchEmbed(patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
-        num_patches = 8*8*32
+        self.use_ae = use_ae
+        self.patch_embed = PatchEmbed(
+            img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
+        num_patches = self.patch_embed.num_patches
 
         self.time_embed = nn.Sequential(
             nn.Linear(embed_dim, 4 * embed_dim),
@@ -177,19 +165,28 @@ class UViT(nn.Module):
             nn.Linear(4 * embed_dim, embed_dim),
         ) if mlp_time_embed else nn.Identity()
 
-        # if self.num_classes > 0:
-        #     self.label_emb = nn.Embedding(self.num_classes, embed_dim)
-        #     self.extras = 2
-        # else:
-        #     self.extras = 1
-        self.extras = 1
-        self.label_emb = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim),
-            nn.GELU(),
-            nn.Linear(embed_dim, embed_dim),
+        # self.context_embed = nn.Linear(clip_dim, 6)
+
+        self.context_embed = nn.Sequential(
+                nn.Linear(1827, 1024),
+                nn.GELU(),
+                nn.Linear(1024, 512),
+                nn.GELU(),
+                nn.Linear(512, 256),
+                nn.GELU(),
+                nn.Linear(256, 9),
         )
 
-        self.pos_embed = nn.Parameter(torch.zeros(1, self.extras + num_patches, embed_dim))
+        self.mlp = nn.Sequential(
+                nn.Linear(64, 9),
+                nn.GELU(),
+                nn.Linear(9, 9),
+        )
+
+        self.extras = 1 + num_clip_token
+
+        # self.pos_embed = nn.Parameter(torch.zeros(1, self.extras + num_patches, embed_dim))
+        self.pos_embed = nn.Parameter(torch.zeros(1, 32, 27))
 
         self.in_blocks = nn.ModuleList([
             Block(
@@ -209,23 +206,8 @@ class UViT(nn.Module):
 
         self.norm = norm_layer(embed_dim)
         self.patch_dim = patch_size ** 2 * in_chans
-        # self.decoder_pred = nn.Linear(embed_dim, self.patch_dim, bias=True)
-        self.decoder_pred = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim),
-            nn.GELU(),
-            nn.Linear(embed_dim, embed_dim),
-            nn.GELU(),
-            nn.Linear(embed_dim, embed_dim),
-        )
-        # self.final_layer = nn.Sequential(
-        #     nn.Linear(32*in_chans, 32*in_chans),
-        #     nn.GELU(),
-        #     nn.Linear(32*in_chans, 32*in_chans),
-        #     nn.GELU(),
-        #     nn.Linear(32*in_chans, 32*in_chans),
-        # )
-        self.final_layer = nn.Identity()
-
+        self.decoder_pred = nn.Linear(embed_dim, self.patch_dim, bias=True)
+        self.final_layer = nn.LayerNorm(9)
         trunc_normal_(self.pos_embed, std=.02)
         self.apply(self._init_weights)
 
@@ -242,21 +224,19 @@ class UViT(nn.Module):
     def no_weight_decay(self):
         return {'pos_embed'}
 
-    def forward(self, x, timesteps, y=None):
+    def forward(self, x, timesteps, context):
         '''
-        x: [bs,32,in_channel]
-        y: [bs,32,1827]
+        x:[bs,32,6]
         '''
-        # x = rearrange(x,'b (w h) c -> b c w h', w=16)  #[bs,in_channel,2,16] in_channel=6
-        # x = self.patch_embed(x)
+        x = x.float()
         B, L, D = x.shape
-        time_token = self.time_embed(timestep_embedding(timesteps, self.embed_dim))
-        time_token = time_token.unsqueeze(dim=1)
-        x = torch.cat((time_token, x), dim=1)
-        if y is not None:
-            label_emb = self.label_emb(y)
-            x = torch.cat((label_emb, x), dim=1)
+
+        time_token = self.time_embed(timestep_embedding(timesteps, 9*32))
+        time_token = time_token.unsqueeze(dim=1).view(B,32,9)
+        context_token = self.context_embed(context)
+        x = torch.cat((time_token, context_token, x), dim=2)
         x = x + self.pos_embed
+
         skips = []
         for blk in self.in_blocks:
             x = blk(x)
@@ -269,30 +249,7 @@ class UViT(nn.Module):
 
         x = self.norm(x)
         x = self.decoder_pred(x)
-        assert x.size(1) == self.extras + L
-        x = x[:, self.extras:, :]
-        # x = unpatchify(x, self.in_chans)
-        # x = einops.rearrange(x,'b c w h -> (b w h) c')
-        # x[:,3:] = pre_handle(x[:,3:].clone())
-        # x = einops.rearrange(x,'(b n) c -> b n c',n=32)
-        # x = self.final_layer(x)
-        # x = einops.rearrange(x,'b (n c) -> (b n) c',n=32)
+        x = self.mlp(x)
+        x = self.final_layer(x)
 
-        # diffusion2
-        # x = einops.rearrange(x,'b c w h -> (b w h) c')
-        # x[:,3:] = pre_handle(x[:,3:].clone())
-        # x = einops.rearrange(x,'(b n) c -> b n c',n=32)
-        # x = einops.rearrange(x,'b c w h -> b (w h) c')
-
-        # train
-        # x = einops.rearrange(x,'b c w h -> b (w h c)')
-        # x = self.final_layer(x)
-        # x = einops.rearrange(x,'b (n c) -> (b n) c',n=32)
-        # x[:,3:] = pre_handle(x[:,3:].clone())
-        # x = einops.rearrange(x,'(b n) c -> b n c',n=32)
         return x
-
-if __name__ == '__main__':
-    net = UViT()
-    a = torch.rand(16,32,6)
-    net(a,None)

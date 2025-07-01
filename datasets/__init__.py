@@ -1,4 +1,2 @@
 from datasets.TeethDataset import *
-from datasets.FullTeethDataset import *
-from datasets.PairDataset import *
-from datasets.AxisDataset import *
+from datasets.DentalDataset import *
