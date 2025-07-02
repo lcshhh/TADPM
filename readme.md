@@ -1,7 +1,8 @@
 # TADPM：Automatic Tooth Arrangement with Joint Features of Point and Mesh Representations via Diffusion Probabilistic Models
 
 This is the official PyTorch implementation of our CAGD paper *"Automatic Tooth Arrangement with Joint Features of Point and Mesh Representations via Diffusion Probabilistic Models."*
-[paper link](https://www.sciencedirect.com/science/article/abs/pii/S016783962400027X)
+
+<a href="https://www.sciencedirect.com/science/article/abs/pii/S016783962400027X" style="text-decoration: none;">[paper link]</a>
 
 ### Installation
 
