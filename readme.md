@@ -79,8 +79,7 @@ To pretrain MeshMAE:
 ```shell
 bash scripts/pretrain.sh
 ```
-
-You can also refer to https://github.com/liang3588/MeshMAE
+You can also refer to https://github.com/liang3588/MeshMAE for more details.
 
 
 

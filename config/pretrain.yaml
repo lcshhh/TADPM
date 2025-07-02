@@ -5,14 +5,14 @@ scheduler: { type: CosLR, kwargs: { epochs: 500, initial_epochs: 20 } }
 dataset : {
   train : { NAME: teethDataset,
             train: True,
-            file: files/pretrain/train.txt,
+            file: *,
             },
   val : { NAME: teethDataset,
           train: False,
-          file: files/pretrain/test.txt,},
+          file: *,},
   test : {  NAME: teethDataset,
             train: False,
-            file: files/pretrain/test.txt,
+            file: *,
             }}
 
 npoints: 512
