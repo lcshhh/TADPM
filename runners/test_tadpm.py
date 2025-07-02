@@ -71,8 +71,6 @@ def test_tadpm(args, config, logger):
             masks = masks.cuda()
             outputs = base_model(faces, feats, center, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
 
-            # transform_mesh(index[2],outputs[2])
-
             predicted_centroid = outputs[:,:,:3]
             rot6d = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
             criterion = nn.MSELoss(reduction='none')
