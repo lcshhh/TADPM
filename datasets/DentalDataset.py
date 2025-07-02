@@ -119,12 +119,12 @@ class DentalDataset(data.Dataset):
                 after = read_pointcloud(after_path)
                 after_points[i] = after[:point_num]
                 after_centroid[i] = after[point_num] 
-                if self.train and np.random.rand() < 0.3:
-                    mesh, rotation, translation = randomize_mesh_orientation(mesh)
-                    rot_matrix = rotation.as_matrix()
-                    before_points[i] = (before_points[i] - np.expand_dims(centroid[i],0)) @ rot_matrix + np.expand_dims(centroid[i] + translation,0)
-                    centroid[i] = centroid[i] + translation
-                    matrix[i] = rot_matrix.T @ matrix[i]
+                # if self.train and np.random.rand() < 0.3:
+                #     mesh, rotation, translation = randomize_mesh_orientation(mesh)
+                #     rot_matrix = rotation.as_matrix()
+                #     before_points[i] = (before_points[i] - np.expand_dims(centroid[i],0)) @ rot_matrix + np.expand_dims(centroid[i] + translation,0)
+                #     centroid[i] = centroid[i] + translation
+                #     matrix[i] = rot_matrix.T @ matrix[i]
 
                 feats[i], center[i], cordinates[i], faces[i], Fs[i]= load_mesh_shape(mesh, 
                                                                     request=self.feats)

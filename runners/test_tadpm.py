@@ -74,7 +74,7 @@ def test_tadpm(args, config, logger):
                 masks = masks.cuda()
                 outputs = base_model(faces, feats, center, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
 
-                transform_mesh(index[6],outputs[6])
+                transform_mesh(index[2],outputs[2])
                 exit()
 
                 predicted_centroid = outputs[:,:,:3]

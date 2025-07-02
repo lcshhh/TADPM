@@ -36,6 +36,14 @@ def robust_compute_rotation_matrix_from_ortho6d(poses):
     matrix = torch.cat((x, y, z), 2)  # batch*3*3
     return matrix
 
+def get_matrix(centroid):
+    return torch.cdist(centroid,centroid)
+
+def get_matrix_mask(masks):
+    f_masks = masks.float()
+    matrix_mask = torch.bmm(f_masks.unsqueeze(-1),f_masks.unsqueeze(-2))
+    return matrix_mask
+
 def train_tadpm(args, config, train_writer, val_writer, logger):
     # build dataset
     config.model.args = args
@@ -79,7 +87,7 @@ def train_tadpm(args, config, train_writer, val_writer, logger):
         data_time = AverageMeter()
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
-        losses = AverageMeter(['loss'])
+        losses = AverageMeter(['loss','loss1','loss2','loss3','loss4'])
         # validate(base_model, test_dataloader, epoch, val_writer, arg s, config, logger=logger)
         for idx, (index,feats,center,cordinates,faces,Fs,before_points,after_points,centroid,after_centroid,gt_params,masks) in enumerate(train_dataloader): 
             optimizer.zero_grad()
@@ -99,22 +107,33 @@ def train_tadpm(args, config, train_writer, val_writer, logger):
             masks = masks.cuda()
             #######
             outputs = base_model(faces, feats, center, Fs, cordinates, centroid, before_points, gt_params).to(torch.float32).cuda()
-            predicted_translation = outputs[:,:,:3]
+            predicted_centroid = outputs[:,:,:3]
             rot6d = rearrange(outputs[:,:,3:],'b n c -> (b n) c')
-            criterion = nn.MSELoss(reduction='none')
+            criterion1 = nn.MSELoss(reduction='none')
+            criterion2 = nn.L1Loss(reduction='none')
             rot_matrix = rotation_6d_to_matrix(rot6d)
             # rot_matrix = robust_compute_rotation_matrix_from_ortho6d(rot6d)
             
             predicted_points = rearrange(before_points - centroid.unsqueeze(2),'b n p c -> (b n) p c')
             predicted_points = torch.bmm(predicted_points,rot_matrix)
-            predicted_points = predicted_points + rearrange(predicted_translation,'b n c->(b n) c').unsqueeze(1)
+            predicted_points = predicted_points + rearrange(predicted_centroid,'b n c->(b n) c').unsqueeze(1)
             after_points = rearrange(after_points,'b n p c -> (b n) p c')
-            loss = criterion(predicted_points,after_points).sum(dim=(1,2))
-            loss = 0.001*(loss * masks.flatten()).sum()
+            loss1 = criterion1(predicted_points,after_points).sum(dim=(1,2)) 
+            loss1 = 0.001*(loss1 * masks.flatten()).sum()
+
+        # loss for diffusion
+            loss2 = 0.03*((criterion1(outputs,gt_params).sum(dim=-1)) * masks).mean()
+
+            # position loss
+            loss3 = 0.001*(criterion1(get_matrix(centroid), get_matrix(predicted_centroid)) * get_matrix_mask(masks)).sum()
+
+            loss4 = criterion2(predicted_points,after_points).sum(dim=(1,2)) 
+            loss4 = 0.05*(loss4 * masks.flatten()).mean()
+            loss = loss1 + loss2 + loss3 + loss4
             #######
             loss.backward()
             optimizer.step()
-            losses.update([loss.item()])
+            losses.update([loss.item(),loss1.item(),loss2.item(),loss3.item(),loss4.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
