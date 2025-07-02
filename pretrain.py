@@ -30,11 +30,6 @@ def get_args():
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--val_freq', type = int, default=1, help = 'test freq')
     parser.add_argument(
-        '--test', 
-        action='store_true', 
-        default=False, 
-        help = 'test mode for certain ckpt')
-    parser.add_argument(
         '--finetune_model', 
         action='store_true', 
         default=False, 
@@ -86,10 +81,7 @@ def main():
     misc.set_random_seed(args.seed, deterministic=args.deterministic)
         
     # run
-    if args.test:
-        test_global(args, config, logger)
-    else:
-        pretrain(args, config, train_writer, val_writer, logger)
+    pretrain(args, config, train_writer, val_writer, logger)
 
 
 if __name__ == '__main__':

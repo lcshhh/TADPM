@@ -1,8 +1,8 @@
 python data_preprocess/get_pointcloud.py \
-    --before_dataroot '/data3/leics/dataset/type2_process_final/single_before' \
-    --after_dataroot '/data3/leics/dataset/type2_process_final/single_after' \
-    --before_output '/data3/leics/dataset/type2_process_final/pcd_before512' \
-    --after_output '/data3/leics/dataset/type2_process_final/pcd_after512' \
+    --before_dataroot '*/single_before' \
+    --after_dataroot '*/single_after' \
+    --before_output '*/pcd_before512' \
+    --after_output '*/pcd_after512' \
     --sample_num 512
 
 # before_dataroot: data root for single tooth before treatment

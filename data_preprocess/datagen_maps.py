@@ -116,7 +116,7 @@ def make_MAPS_shape(in_path, out_path, base_size, depth):
  
 def MAPS_demo1(args):
     '''Apply MAPS to a single 3D model'''
-    data_root = Path(args.dataroot)
+    data_root = Path(args.simplify)
     output_path = args.output
     pool = Pool(processes=32)
     if not os.path.exists(output_path):
@@ -156,7 +156,7 @@ def MAPS_demo2():
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataroot', type=str, required=True)
+    parser.add_argument('--simplify', type=str, required=True)
     parser.add_argument('--output', type=str, required=True)
     args = parser.parse_args()
     MAPS_demo1(args)

@@ -87,7 +87,7 @@ def train_tadpm(args, config, train_writer, val_writer, logger):
         data_time = AverageMeter()
         base_model.train()  # set model to training mode
         n_batches = len(train_dataloader)
-        losses = AverageMeter(['loss','loss1','loss2','loss3','loss4'])
+        losses = AverageMeter(['loss','loss1','loss2','loss3'])
         # validate(base_model, test_dataloader, epoch, val_writer, arg s, config, logger=logger)
         for idx, (index,feats,center,cordinates,faces,Fs,before_points,after_points,centroid,after_centroid,gt_params,masks) in enumerate(train_dataloader): 
             optimizer.zero_grad()
@@ -121,19 +121,17 @@ def train_tadpm(args, config, train_writer, val_writer, logger):
             loss1 = criterion1(predicted_points,after_points).sum(dim=(1,2)) 
             loss1 = 0.001*(loss1 * masks.flatten()).sum()
 
-        # loss for diffusion
+            # loss for diffusion
             loss2 = 0.03*((criterion1(outputs,gt_params).sum(dim=-1)) * masks).mean()
 
             # position loss
             loss3 = 0.001*(criterion1(get_matrix(centroid), get_matrix(predicted_centroid)) * get_matrix_mask(masks)).sum()
 
-            loss4 = criterion2(predicted_points,after_points).sum(dim=(1,2)) 
-            loss4 = 0.05*(loss4 * masks.flatten()).mean()
-            loss = loss1 + loss2 + loss3 + loss4
+            loss = loss1 + loss2 + loss3
             #######
             loss.backward()
             optimizer.step()
-            losses.update([loss.item(),loss1.item(),loss2.item(),loss3.item(),loss4.item()])
+            losses.update([loss.item(),loss1.item(),loss2.item(),loss3.item()])
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
@@ -152,8 +150,6 @@ def train_tadpm(args, config, train_writer, val_writer, logger):
         if train_writer is not None:
             train_writer.add_scalar('Loss/Epoch/Loss', losses.avg(0), epoch)
 
-        # print_log('[Training] EPOCH: %d EpochTime = %.3f (s) Losses = %s lr = %.6f' %
-        #     (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']), logger = logger)
         logger.info('[Training] EPOCH: %d EpochTime = %.3f (s) Loss = %s lr = %.6f' %
             (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()],optimizer.param_groups[0]['lr']))
 
@@ -210,9 +206,5 @@ def validate(base_model, test_dataloader, epoch, val_writer, args, config, logge
 
         logger.info('[Validation] EPOCH: %d  Loss = %s' % (epoch,['%.4f' % l for l in losses.avg()]))
 
-
-    # Add testing results to TensorBoard
-    # if val_writer is not None:
-    #     val_writer.add_scalar('Metric/loss', losses.avg(), epoch)
 
     return losses.avg()[0]

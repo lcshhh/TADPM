@@ -23,7 +23,7 @@ class TADPM(nn.Module):
     def __init__(self,config):
         super(TADPM, self).__init__()
         self.encoder = Mesh_encoder()
-        self.encoder.requires_grad_(False)
+        # self.encoder.requires_grad_(False)
         embed_dim = config.dim
         self.embed_dim = embed_dim
         self.global_encoder = PointNetEncoder()
@@ -35,17 +35,6 @@ class TADPM(nn.Module):
         final_dim = embed_dim + 32 + 1024 + 3
         self.ln = nn.LayerNorm(final_dim)
         self.regressor = diffusion(final_dim)
-        # self.regressor = nn.Sequential(
-        #         nn.Linear(1827, 1024),
-        #         # nn.Dropout(0.3),
-        #         nn.GELU(),
-        #         nn.Linear(1024, 512),
-        #         # nn.Dropout(0.3),
-        #         nn.GELU(),
-        #         nn.Linear(512,256),
-        #         nn.GELU(),
-        #         nn.Linear(256, 9)
-        #     )
         self.initialze_weights()   
         if config.args.encoder_ckpts != '':
             checkpoint = torch.load(config.args.encoder_ckpts)['base_model']
@@ -83,7 +72,6 @@ class TADPM(nn.Module):
         embedding = torch.cat([global_embedding,trans_feature,centroid],dim=-1)
         embedding = self.ln(embedding)
         dofs = self.regressor(gt_6dof,embedding)
-        # dofs = self.regressor(embedding).reshape(-1,32,9)
         return dofs
 
  
