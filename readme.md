@@ -38,7 +38,7 @@ See the [Data Use Agreement](./Data-Use-Agreement.pdf) for details.
 
 
 
-### Data pre-process
+## Data pre-process
 
 - First you need to extract single tooth meshes from dental models, run:
 
@@ -72,7 +72,7 @@ You need to **adjust the data directory parameters** in all the scripts mentione
 
 
 
-### Pretraining
+## Pretraining
 
 To pretrain MeshMAE:
 
@@ -85,7 +85,7 @@ You need to modify the `file` parameter in `config/pretrain.yaml`, replacing it 
 
 
 
-### Training
+## Training
 
 To train the TADPM model:
 
