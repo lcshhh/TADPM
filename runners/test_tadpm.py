@@ -83,8 +83,4 @@ def test_tadpm(args, config, logger):
             loss = 40*(loss * masks.flatten().unsqueeze(1)).mean()
             losses.update([loss.item()])
     print(f"Calculated ADD metric is: {losses.avg()[0]:.4f}")
-                
-
-
-
-    # Add testing results to TensorBoard
+            
