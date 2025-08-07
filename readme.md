@@ -36,7 +36,7 @@ To install manifold, please refer to https://github.com/ZhaoHengJiang/MeshRecons
 
 ## Dataset
 
-See the [Data Use Agreement](./Data-Use-Agreement.pdf) for details.
+See the [Data Use Agreement](./Data-Use-Agreement.pdf) for details.(If you have trouble viewing the DUA on the GitHub page, please clone the repository.)
 
 
 
